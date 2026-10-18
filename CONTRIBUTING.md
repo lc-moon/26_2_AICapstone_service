@@ -59,5 +59,7 @@ git branch -f main origin/main       # 내 main은 GitHub의 main과 같게 되�
 ## 지키면 편한 것
 
 - **PR은 작게 자주.** 할 일 체크리스트 한두 개씩이 리뷰도 빠릅니다
+- **리뷰를 기다리는 동안 다음 일을 하려면** 같은 브랜치에 이어서 올리거나(PR에 붙음), 관계없는 일은 **최신 `main`에서** 새 브랜치를 만드세요.
+  리뷰 중인 브랜치에서 새 브랜치를 따면, 앞 PR이 머지된 뒤 같은 변경이 두 번 들어가 충돌이 납니다
 - A는 `server/`만, B는 `web/`만 고칩니다. `shared/`는 고치지 않습니다
 - 다른 사람이 먼저 머지해서 충돌이 나면 `git switch main && git pull && git switch 내브랜치 && git merge main`으로 합치고 고칩니다. 막히면 PR에 적어 주세요
