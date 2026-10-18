@@ -46,6 +46,16 @@ push하면 GitHub 저장소 페이지에 **Compare & pull request** 버튼이 �
 
 **5. 머지된 뒤** — 팀장이 머지하면 GitHub의 브랜치는 자동으로 지워집니다. 다음 할 일은 1번부터 다시.
 
+## main에서 작업해 버렸다면
+
+브랜치를 안 만들고 `main`에서 고치거나 커밋해도 **내 PC에서는** 됩니다. `git push`할 때 거절될 뿐입니다. 그대로 브랜치로 옮기면 됩니다.
+
+```bash
+git switch -c server/할일이름        # 지금 상태(고친 것·커밋 포함)를 새 브랜치로
+git push -u origin server/할일이름   # 이 브랜치로 PR
+git branch -f main origin/main       # 내 main은 GitHub의 main과 같게 되돌림
+```
+
 ## 지키면 편한 것
 
 - **PR은 작게 자주.** 할 일 체크리스트 한두 개씩이 리뷰도 빠릅니다

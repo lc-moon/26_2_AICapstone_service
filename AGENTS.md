@@ -9,6 +9,20 @@
 - 첫 마감 **2026-10-27**, 교내 전시 **2026-11-11**
 - **A는 `server/`만, B는 `web/`만** 고칩니다. `shared/`는 팀장이 만든 공통 자료라 고치지 않습니다(필요하면 팀장에게 요청)
 - API를 바꾸고 싶으면 A·B·팀장이 합의한 뒤 이 파일을 먼저 고칩니다
+- **머지되면 단톡에 한 줄** 남깁니다. 특히 A의 API가 하나 머지되면 B가 연결해 볼 수 있으니 꼭 알려 주세요
+
+## LLM·코딩 에이전트가 작업할 때 (꼭 지킬 것)
+
+이 저장소에서 코드를 고치는 AI 도구는 아래 순서를 따릅니다. 사람이 git을 잘 몰라도 이대로 하면 됩니다.
+
+1. 시작 전 `git status`와 `git branch --show-current`로 확인. **`main`이면 작업하지 말고** 최신을 받은 뒤 새 브랜치를 만든다
+   (`git switch main && git pull && git switch -c server/할일이름` — B는 `web/할일이름`)
+2. 맡은 역할의 폴더만 고친다(A `server/`, B `web/`). `shared/`, `AGENTS.md`, `.github/`는 고치지 않는다
+3. `.env`와 인증키는 커밋하지 않는다. 키가 필요하면 `.env.example`에 이름만 적는다
+4. 할 일 한두 개가 끝나면 커밋하고 `git push -u origin 브랜치이름`
+5. PR을 만든다. `gh`가 있으면 `gh pr create`(양식은 `.github/pull_request_template.md`), 없으면 사람에게 GitHub 페이지의 **Compare & pull request** 버튼을 누르라고 안내한다
+6. `main`에 직접 push하지 않는다(막혀 있음). 이미 `main`에서 커밋해 버렸다면 [CONTRIBUTING.md](CONTRIBUTING.md)의 "main에서 작업해 버렸다면"을 따른다
+7. 실행 방법(설치, `.env`, 실행 명령)이 생기면 `server/README.md` 또는 `web/README.md`에 적는다
 
 ## 전체 구조
 
@@ -91,6 +105,8 @@
 - VM 한 대에 API·DB·화면 파일을 함께(GCP e2-micro 1GB, 스왑 1~2GB). GCP 계정은 팀장이 정함
 - 브라우저가 API를 직접 부르므로 페이지가 https면 API도 https여야 함 → DuckDNS + Caddy(인증서 자동)
 - 같은 주소라 CORS 불필요(로컬 개발 때만 localhost 허용)
+- **배포 절차는 A가 정해 `server/README.md`에 적습니다**: VM에 이 저장소를 받아 두고 `main`이 바뀌면 어떻게 반영하는지(예: `git pull` 후 재시작),
+  B의 화면 파일을 어느 폴더에서 내보내는지. B는 그 문서에 맞춰 화면 파일을 둡니다(빌드 도구를 쓰면 빌드 결과 위치도 맞추기)
 
 ## 나중에 (여유 있으면)
 
