@@ -1,0 +1,19 @@
+{
+ "inside": true,
+ "gu": "연수구",
+ "grid_id": 38,
+ "estimate": {
+  "pm25": 13.3,
+  "grade": "좋음",
+  "slot": "2026-10-16T13:20:00+09:00",
+  "source": "cctv",
+  "nearest_cctv_km": 2.4
+ },
+ "station": {
+  "name": "아암",
+  "distance_km": 1.4,
+  "pm25": 11,
+  "data_time": "2026-10-16T13:00:00+09:00",
+  "period": "12~13시 평균"
+ }
+}

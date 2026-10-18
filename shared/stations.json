@@ -1,0 +1,428 @@
+{
+ "stations": [
+  {
+   "station_name": "주안",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.692888,
+   "lat": 37.455474,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "부평",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.723415,
+   "lat": 37.499184,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "연희",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.675833,
+   "lat": 37.545556,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "검단",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.661444,
+   "lat": 37.602041,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "계산",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.730278,
+   "lat": 37.546111,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "효성",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.71511,
+   "lat": 37.52922,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "고잔",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.697158,
+   "lat": 37.404839,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "서창",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.7461,
+   "lat": 37.4274,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "석남",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.674722,
+   "lat": 37.502778,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "동춘",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.678309,
+   "lat": 37.409493,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "운서",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.487769,
+   "lat": 37.49659,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "영흥",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.483536,
+   "lat": 37.255942,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "논현",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.726111,
+   "lat": 37.404167,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "청라",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.63879,
+   "lat": 37.537745,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "송도",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.654663,
+   "lat": 37.382084,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "아암",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.63227,
+   "lat": 37.40508,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "원당",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.6986,
+   "lat": 37.5941,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "길상",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.490972,
+   "lat": 37.640887,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "삼산",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.73643,
+   "lat": 37.51279,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "신흥",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.635,
+   "lat": 37.468333,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "영종",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.563919,
+   "lat": 37.494835,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "송림",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.643199,
+   "lat": 37.473818,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "구월동",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.724167,
+   "lat": 37.449722,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "숭의",
+   "sido": "인천",
+   "network": "도시대기",
+   "lon": 126.6686,
+   "lat": 37.4725,
+   "use_for_compare": true
+  },
+  {
+   "station_name": "소사본동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7999056,
+   "lat": 37.4800328,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "내동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7737,
+   "lat": 37.5203,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "중2동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7701,
+   "lat": 37.4939,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "오정동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7967,
+   "lat": 37.5278,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "사우동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.716748,
+   "lat": 37.619335,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "고촌읍",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.762831,
+   "lat": 37.606724,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "월곶면",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.5526,
+   "lat": 37.7151,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "한강신도시",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.6292725,
+   "lat": 37.6532578,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "새솔동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.8188,
+   "lat": 37.2814,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "철산동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.86981,
+   "lat": 37.476221,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "소하동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.884909,
+   "lat": 37.452158,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "고잔동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.8305,
+   "lat": 37.3221,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "초지동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.755998,
+   "lat": 37.315015,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "본오동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.864488,
+   "lat": 37.289237,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "원곡동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.794167,
+   "lat": 37.336667,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "부곡동1",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.8611,
+   "lat": 37.332,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "대부동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.5854,
+   "lat": 37.2437,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "호수동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.833521,
+   "lat": 37.304889,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "정왕동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7401,
+   "lat": 37.3468,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "시화산단",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7246,
+   "lat": 37.3367,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "대야동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7884,
+   "lat": 37.4431,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "목감동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.8619,
+   "lat": 37.3857,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "장현동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.8041,
+   "lat": 37.3801,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "배곧동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.73289,
+   "lat": 37.373823,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "운정",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.756434,
+   "lat": 37.723148,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "행신동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.8423,
+   "lat": 37.6251,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "식사동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.813441,
+   "lat": 37.685514,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "신원동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.886708,
+   "lat": 37.666362,
+   "use_for_compare": false
+  },
+  {
+   "station_name": "주엽동",
+   "sido": "경기",
+   "network": "도시대기",
+   "lon": 126.7564,
+   "lat": 37.6683,
+   "use_for_compare": false
+  }
+ ]
+}
