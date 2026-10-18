@@ -9,9 +9,9 @@
 
 ## 처음 왔다면
 
-1. **[AGENTS.md](AGENTS.md)** — 역할(A 백엔드 / B 프론트), 할 일, API, 규칙. LLM에게 작업을 맡길 때도 이 파일을 먼저 읽힙니다
+1. **[AGENTS.md](AGENTS.md)** — 역할(A 백엔드 / B 프론트), 할 일, API, 규칙. LLM에게 작업을 맡길 때도 이 파일을 먼저 읽힙니다. 같은 내용을 [Notion](https://app.notion.com/p/A-B-3fd4a3212e4f81458cd8f40cff41cad5)에도 정리해 뒀습니다
 2. **[CONTRIBUTING.md](CONTRIBUTING.md)** — 브랜치 만들고 PR 올리는 법 (협업이 처음이어도 따라 할 수 있게)
-3. **[shared/](shared/)** — 공통 자료와 API 응답 예시. `shared/mockup/index.html`을 더블클릭하면 목표 화면 시안이 열립니다
+3. **[shared/](shared/)** — 공통 자료와 API 응답 예시. `shared/mockup/index.html`을 더블클릭하면 참고용 화면 시안이 열립니다
 
 ## 폴더
 
