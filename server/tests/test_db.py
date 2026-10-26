@@ -105,3 +105,48 @@ def test_all_null_slot_has_no_frame(client, db):
     assert res["frames"][0]["n_inputs"] == 0
     assert count(db, "SELECT count(*) FROM frames") == 0
     assert count(db, "SELECT count(*) FROM estimates") == 19
+
+
+def test_point_matches_mock(client, db):
+    post(client, mock("ingest_estimates.json")["rows"])
+    want = mock("point_inside.json")
+    got = client.get("/api/point", params={"lon": 126.6395, "lat": 37.3935}).json()   # 송도 센트럴파크 (mock과 같은 점)
+    assert got["inside"] and got["gu"] == want["gu"] and got["grid_id"] == want["grid_id"]
+    assert got["estimate"] == want["estimate"]
+    assert got["station"] is None   # 에어코리아 수집 전
+
+
+def test_point_every_cell_center_has_value(client, db):
+    post(client, mock("ingest_estimates.json")["rows"])
+    values = mock("frames_latest.json")["values"]
+    for c in mock("grid.json")["cells"][::25]:
+        lon, lat = c["center"]
+        got = client.get("/api/point", params={"lon": lon, "lat": lat}).json()
+        if got["inside"]:   # 칸 중심이 바다인 해안 칸은 범위 밖일 수 있다
+            assert got["grid_id"] == c["grid_id"] and got["estimate"]["pm25"] == values[c["grid_id"]]
+
+
+def test_point_before_any_frame(client, db):
+    got = client.get("/api/point", params={"lon": 126.6395, "lat": 37.3935}).json()
+    assert got["inside"] and got["estimate"] is None
+
+
+def test_health(client, db, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    import app
+    kst = timezone(timedelta(hours=9))
+    at = lambda *a: monkeypatch.setattr(app, "now", lambda: datetime(*a, tzinfo=kst))
+
+    at(2026, 10, 16, 13, 50)
+    assert client.get("/api/health").json() == {"last_slot": None, "last_received_at": None, "stale": True}
+
+    post(client, mock("ingest_estimates.json")["rows"])
+    db.execute("UPDATE estimates SET received_at = '2026-10-16T13:25:00+09'")
+    want = {"last_slot": "2026-10-16T13:20:00+09:00", "last_received_at": "2026-10-16T13:25:00+09:00"}
+    assert client.get("/api/health").json() == {**want, "stale": False}   # 25분 전
+    at(2026, 10, 16, 14, 10)
+    assert client.get("/api/health").json() == {**want, "stale": True}    # 45분 전, 낮
+    at(2026, 10, 16, 22, 0)
+    assert client.get("/api/health").json()["stale"] is False             # 밤
+    at(2026, 10, 17, 6, 50)
+    assert client.get("/api/health").json()["stale"] is False             # 해 뜬 직후 40분은 기다린다

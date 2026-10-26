@@ -35,23 +35,24 @@
 
 ## 할 일
 
-### A 백엔드·DB (`server/`)
-- [ ] 로컬 PostgreSQL에 `shared/schema.sql` 실행, 공통 자료(격자·카메라·측정소) 넣기
-- [ ] `POST /api/ingest/estimates` — 받아서 저장
-- [ ] 격자 계산(아래 계산 규칙) → `frames` 저장. `shared/mock/ingest_estimates.json`을 넣어 `shared/mock/frames_latest.json`과 값이 같으면 정답
-- [ ] `GET /api/grid`, `GET /api/frames/latest`
-- [ ] 에어코리아 매시 수집 → `observations`
-- [ ] `GET /api/point`, `GET /api/health`
-- [ ] 빈 회차·밤 처리
-- [ ] VM 배포: Caddy + DuckDNS(무료 도메인) + HTTPS, B의 화면 파일도 같은 VM에서
+### A 백엔드·DB (`server/`) — **이어서 할 일과 순서는 [server/NEXT.md](server/NEXT.md)**
+- [x] 로컬 PostgreSQL에 `shared/schema.sql` 실행, 공통 자료(격자·카메라·측정소) 넣기
+- [x] `POST /api/ingest/estimates` — 받아서 저장
+- [x] 격자 계산(아래 계산 규칙) → `frames` 저장. `shared/mock/ingest_estimates.json`을 넣어 `shared/mock/frames_latest.json`과 값이 같으면 정답
+- [x] `GET /api/grid`, `GET /api/frames/latest`
+- [x] `GET /api/health`, `GET /api/point`(추정값까지. `station`은 에어코리아 수집 뒤)
+- [ ] 로컬 개발용 CORS (localhost만)
+- [ ] 에어코리아 매시 수집 → `observations`, `/api/point`의 `station` 채우기
+- [ ] 빈 회차·밤 처리 (지금은 회차 값이 전부 null이면 프레임을 안 만드는 데까지)
+- [ ] 배포 — 10/29 시연용으로 팀장이 수집 VM에 올림(`incheon-air.duckdns.org`). 절차는 배포 후 `server/README.md`
 - [ ] (여유) `GET /api/frames` 기간 조회, `daily_metrics`
 
 ### B 프론트 (`web/`)
-- [ ] `shared/mockup/index.html` 열어 보고 코드 읽기 — 팀장이 만들어 본 참고 시안. 이런 느낌이면 좋지만 더 나은 방향이 있으면 그쪽으로
-- [ ] `shared/mock/` 응답으로 첫 화면: 지도 + 구름 + 인천 밖 가림 + 범례 + 기준 시각
-- [ ] 클릭 → 확대 + 패널(`/api/point`), 범위 밖 클릭 안내
-- [ ] 밤 표시, 오래된 값 경고
-- [ ] A의 API에 연결
+- [x] `shared/mockup/index.html` 열어 보고 코드 읽기 — 팀장이 만들어 본 참고 시안. 이런 느낌이면 좋지만 더 나은 방향이 있으면 그쪽으로
+- [x] `shared/mock/` 응답으로 첫 화면: 지도 + 구름 + 인천 밖 가림 + 범례 + 기준 시각
+- [x] 클릭 → 확대 + 패널(`/api/point`), 범위 밖 클릭 안내
+- [x] 밤 표시, 오래된 값 경고
+- [ ] A의 API에 연결 — 배포되면 실제 주소에서 확인
 - [ ] (여유) 지난 N일 애니메이션, 장소 검색
 
 ## API
