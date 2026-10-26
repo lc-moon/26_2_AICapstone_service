@@ -95,6 +95,9 @@ async function start(){
   map=new maplibregl.Map({container:'map',style:'https://tiles.openfreemap.org/styles/liberty',bounds,pitch:40,bearing:-12,maxBounds:[[bounds[0][0]-.25,bounds[0][1]-.15],[bounds[1][0]+.25,bounds[1][1]+.15]],attributionControl:{compact:true,customAttribution:'추정: 인천교통정보센터 CCTV · 실측: 에어코리아 · 행정경계: 통계청 SGIS (vuski/admdongkor, CC BY 4.0)'}});
   map.addControl(new maplibregl.NavigationControl(),'top-right');{const ab=document.querySelector('.maplibregl-ctrl-bottom-right');if(ab)new ResizeObserver(()=>document.documentElement.style.setProperty('--attrib-h',ab.offsetHeight+'px')).observe(ab);}
   map.on('error',()=>{mapIssue='지도 일부를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';showStatus();});
+  // 클릭 확대 중 지나간 화면의 조각이 실패해도 지금 보이는 조각이 다 받아졌으면 경고를 지운다. 보이는 조각이 실패했으면 남긴다
+  // (sourceCaches._tiles는 MapLibre 내부 값이라 버전을 올리면 확인할 것. 지금 4.7.1)
+  map.on('idle',()=>{if(mapIssue&&!Object.values(map.style?.sourceCaches||{}).some(c=>Object.values(c._tiles||{}).some(t=>t.state==='errored'))){mapIssue='';showStatus();}});
   map.on('load',()=>{
    for(const l of map.getStyle().layers.filter(l=>l.type==='symbol')){
     if(/shield/.test(l.id)){map.removeLayer(l.id);continue;}
