@@ -74,3 +74,29 @@ TEST_DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/pm_map_test 
 - 한 회차의 값이 전부 `null`이면 그 회차 CCTV 프레임을 만들지 않습니다(`n_inputs: 0`). 측정소로 메우는 것은 다음 PR
 
 아직: CORS, 에어코리아 수집, `/api/point`의 `station`, 밤·빈 회차 → **이어서 할 일은 [NEXT.md](NEXT.md)**
+
+## 배포 (2026-10-27, 팀장)
+
+10/29 시연용으로 **CCTV 수집 VM**(`cctv-collector`, GCP e2-micro 1GB, Ubuntu 24.04)에 같이 올렸습니다. 주소 **https://incheon-air.duckdns.org**
+
+| 구성 | 위치 | 비고 |
+|---|---|---|
+| 저장소 | `/srv/incheon-air` (`main`) | `.env`는 서버에만(권한 600). DB 비밀번호·수신 토큰은 서버에서 만들어 넣음 |
+| PostgreSQL 16 | DB `pm_map`, 사용자 `pm_map` | localhost만. 메모리 작게(`/etc/postgresql/16/main/conf.d/small.conf`) |
+| API | `incheon-air-api.service` → `127.0.0.1:8001` | uvicorn 1개, `MemoryMax=200M`, 재부팅 시 자동 시작 |
+| Caddy | `/etc/caddy/Caddyfile` | HTTPS 자동. `/api/*`는 API로, `/web/`과 `/shared/boundary.geojson`만 파일로, 나머지는 `/web/`으로 돌림 |
+| 추정기 → API | 수집기 저장소 `.env`의 `SERVICE_API_URL=http://127.0.0.1:8001` | 같은 서버라 인터넷을 거치지 않음 |
+| 방화벽 | GCP `allow-web`(tcp 80·443, 태그 `web`) | DB·API 포트는 밖에서 안 열림 |
+
+**`main`이 바뀌면 (팀장이 반영)**
+
+```bash
+cd /srv/incheon-air && git pull
+/srv/incheon-air/.venv/bin/pip install -q -r server/requirements.txt   # requirements가 바뀌었을 때만
+cd server && /srv/incheon-air/.venv/bin/python init_db.py              # shared/가 바뀌었을 때만
+sudo systemctl restart incheon-air-api                                 # server/가 바뀌었을 때. web/만 바뀌면 재시작 필요 없음
+```
+
+- 확인: `curl -s localhost:8001/api/health`, `systemctl status incheon-air-api caddy`
+- 수집기와 메모리를 나눠 써서 서버에 무거운 라이브러리를 넣지 않습니다. 수집기가 우선입니다(메모리가 모자라면 API가 먼저 정리됨)
+

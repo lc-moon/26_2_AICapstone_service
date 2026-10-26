@@ -44,7 +44,7 @@
 - [ ] 로컬 개발용 CORS (localhost만)
 - [ ] 에어코리아 매시 수집 → `observations`, `/api/point`의 `station` 채우기
 - [ ] 빈 회차·밤 처리 (지금은 회차 값이 전부 null이면 프레임을 안 만드는 데까지)
-- [ ] 배포 — 10/29 시연용으로 팀장이 수집 VM에 올림(`incheon-air.duckdns.org`). 절차는 배포 후 `server/README.md`
+- [x] 배포 — 10/29 시연용으로 팀장이 수집 VM에 올림(https://incheon-air.duckdns.org, 10/27). 구성과 반영 방법은 `server/README.md` "배포"
 - [ ] (여유) `GET /api/frames` 기간 조회, `daily_metrics`
 
 ### B 프론트 (`web/`)
