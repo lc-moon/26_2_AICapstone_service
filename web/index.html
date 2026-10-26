@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>인천 에어맵 · 초미세먼지</title><meta name="description" content="인천 내륙과 송도의 초미세먼지 추정 분포와 측정소 관측값을 확인하세요.">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"><link rel="stylesheet" href="style.css">
+<script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script><script type="module" src="app.mjs"></script></head>
+<body><main><div id="map" aria-label="인천 초미세먼지 지도"></div>
+<header class="card" id="title"><div class="eyebrow">INCHEON AIR MAP <span id="mode"></span></div><h1>인천의 공기, 한눈에.</h1><p id="time">데이터를 불러오고 있습니다…</p><p id="source">인천 내륙 · 송도 / PM2.5</p></header>
+<div id="status" class="card" role="status" aria-live="polite" hidden></div>
+<nav class="tools" aria-label="지도 도구"><button id="reset">전체 보기</button><button id="view" aria-pressed="false">2D 보기</button><button id="location">내 위치</button><button id="retry">새로고침</button></nav>
+<section id="panel" class="card" aria-label="선택한 위치의 미세먼지" hidden><button id="close" aria-label="상세 닫기">×</button><div id="details" aria-live="polite"></div></section>
+<div id="toast" class="card" role="status" hidden></div><div id="hint" class="card">궁금한 곳을 눌러 농도를 확인하세요</div>
+<section id="legend" class="card" aria-label="PM2.5 등급 범례"><strong>PM2.5 <small>㎍/㎥</small></strong><div id="grades"></div><p>색은 분포를 나타냅니다 · 회색/빈 영역은 값 없음</p></section>
+</main></body></html>
