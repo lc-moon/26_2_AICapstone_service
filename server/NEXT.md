@@ -24,7 +24,7 @@
 - 어떻게: FastAPI `CORSMiddleware`, `allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?"`, `allow_methods=["GET"]`. **`*`(모두 허용)는 쓰지 않습니다**
 - 완료 기준: `Origin: http://localhost:8766`으로 `GET /api/frames/latest`를 부르면 응답에 `access-control-allow-origin`이 붙고, 다른 Origin에는 안 붙는 테스트
 
-### 2. 에어코리아 매시 수집 → `observations`
+### 2. 에어코리아 매시 수집 → `observations` — **진행 중(승진, `server/airkorea-ingest`)**
 - 규칙은 [AGENTS.md](../AGENTS.md) "계산 규칙"에 다 있습니다. 요약:
   - "시도별 실시간 측정정보"(`getCtprvnRltmMesureDnsty`)를 **매시 50분에 인천·경기 1번씩**(하루 48건, 한도 500)
   - `dataTime`의 `24:00`은 다음 날 `00:00`으로 바꿔야 함(그대로 날짜 변환하면 오류). 13:00 값 = 12~13시 평균
