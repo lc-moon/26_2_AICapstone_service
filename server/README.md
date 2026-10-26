@@ -25,7 +25,7 @@ pip install -r requirements.txt
 createdb -U postgres pm_map     # Windows: "C:\Program Files\PostgreSQL\15\bin\createdb.exe"
 ```
 
-**DB 초기화** — 테이블이 없으면 `shared/schema.sql`을 실행하고, 격자 388칸·카메라 20대·측정소 53곳을 넣습니다.
+**DB 초기화** — 테이블이 없으면 `shared/schema.sql`을 실행하고, 격자 456칸·카메라 20대·측정소 53곳을 넣습니다.
 여러 번 실행해도 안전합니다(공통 자료는 덮어쓰고, 추정값·프레임 같은 시계열은 건드리지 않음). `shared/`가 바뀌면 다시 실행하세요.
 
 ```bash

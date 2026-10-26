@@ -19,7 +19,7 @@ def count(db, sql, *args):
 
 def test_init_is_idempotent(db):
     db.execute("INSERT INTO estimates (camera_id, slot, status) VALUES ('121', '2026-10-16T13:20+09', '정상')")
-    assert init(db) == {"grid_cells": 388, "cameras": 20, "stations": 53, "model_versions": 2}
+    assert init(db) == {"grid_cells": 456, "cameras": 20, "stations": 53, "model_versions": 2}
     assert count(db, "SELECT count(*) FROM estimates") == 1   # 시계열은 지우지 않는다
 
 
