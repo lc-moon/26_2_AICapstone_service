@@ -8,6 +8,7 @@ import logging
 import math
 import os
 from datetime import datetime, timedelta, timezone
+from urllib.parse import unquote
 
 import httpx
 
@@ -100,7 +101,8 @@ def to_rows(items, known):
 def collect(client=None):
     """인천·경기를 받아 observations에 덮어쓴다. 결과 요약을 돌려주고 ingest_log에 남긴다."""
     started = datetime.now(KST)
-    key = os.environ.get("AIRKOREA_API_KEY")
+    # 포털의 Encoding 키(%2B…)를 넣어도 되게. httpx가 다시 인코딩하므로 그대로 보내면 403
+    key = unquote(os.environ.get("AIRKOREA_API_KEY") or "")
     errors, items_in, upserted, stats, missing = [], 0, 0, {}, []
     with connect() as conn:
         # 워커가 여럿이어도 한 번만 (먼저 잡은 쪽만 수집)

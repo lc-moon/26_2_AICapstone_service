@@ -226,6 +226,18 @@ def test_db_error_is_logged_not_raised(db, monkeypatch):
     assert last_log(db)[3].startswith("DB: ForeignKeyViolation")
 
 
+def test_encoding_key_is_decoded(db, monkeypatch):
+    # 포털 Encoding 키를 그대로 넣으면 실제 API가 403 (2026-10-27 실호출로 확인)
+    sent = []
+
+    def handler(req):
+        sent.append(req.url.params["serviceKey"])
+        return ok([])
+    monkeypatch.setenv("AIRKOREA_API_KEY", "ab%2Bc%2Fd%3D%3D")
+    res = airkorea.collect(httpx.Client(transport=httpx.MockTransport(handler)))
+    assert res["errors"] == [] and sent == ["ab+c/d==", "ab+c/d=="]
+
+
 def test_concurrent_run_skipped(db, monkeypatch):
     monkeypatch.setenv("AIRKOREA_API_KEY", KEY)
     from init_db import connect

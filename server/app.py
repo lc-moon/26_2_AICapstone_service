@@ -9,15 +9,19 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Annotated, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 import airkorea
-from idw import idw
+from idw import KX, KY, idw
 from init_db import SHARED, connect
+from sun import is_day
 
 KST = timezone(timedelta(hours=9))
 METHOD = "idw 1/(d²+0.05)"
+STALE_AFTER = timedelta(minutes=40)   # 낮에 2회차(40분) 동안 추정값이 하나도 안 오면 stale
+GRADES = [(15, "좋음"), (35, "보통"), (75, "나쁨")]   # 반올림 후 판정, 그 위는 매우나쁨
 
 
 @asynccontextmanager
@@ -36,6 +40,12 @@ async def lifespan(app):
 
 
 app = FastAPI(title="인천 초미세먼지 지도", lifespan=lifespan)
+# 로컬 개발용: 화면(localhost:8766)이 API(localhost:8000)를 부를 때. 배포는 같은 주소라 필요 없음
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["GET"],
+)
 
 
 def iso(dt):
@@ -164,6 +174,31 @@ def boundary():
     return next(f["geometry"] for f in feats if f["properties"]["kind"] == "area")
 
 
+def in_ring(x, y, ring):
+    inside, j = False, len(ring) - 1
+    for i in range(len(ring)):
+        (xi, yi), (xj, yj) = ring[i], ring[j]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def inside_area(lon, lat):
+    """서비스 범위(boundary.geojson의 area) 안인가. display(화면용)는 바다가 섞여 있어 쓰지 않는다"""
+    g = boundary()
+    polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+    return any(in_ring(lon, lat, p[0]) and not any(in_ring(lon, lat, h) for h in p[1:]) for p in polys)
+
+
+def grade(v):
+    return None if v is None else next((name for top, name in GRADES if round(v) <= top), "매우나쁨")
+
+
+def now():
+    return datetime.now(KST)   # 테스트에서 바꿔 끼운다
+
+
 @app.get("/api/grid")
 def grid():
     with connect() as conn:
@@ -192,3 +227,38 @@ def frames_latest():
         "values": [None if v is None or math.isnan(v) else round(v, 1) for v in values],
         "updated_at": iso(updated),
     }
+
+
+def cell_at(conn, lon, lat):
+    """점이 든 1km 칸. 격자가 area를 빈틈없이 덮으므로 범위 안이면 반드시 있다(경계 반올림 대비 가장 가까운 칸)"""
+    cells = conn.execute("SELECT grid_id, gu, center_lon, center_lat FROM grid_cells").fetchall()
+    return min(cells, key=lambda c: max(abs(lon - c[2]) * KX, abs(lat - c[3]) * KY))
+
+
+@app.get("/api/point")
+def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90)):
+    if not inside_area(lon, lat):
+        return {"inside": False}
+    with connect() as conn:
+        grid_id, gu, _, _ = cell_at(conn, lon, lat)
+        f = conn.execute("SELECT slot, source, values[%s] FROM frames ORDER BY slot DESC LIMIT 1",
+                         (grid_id + 1,)).fetchone()   # PostgreSQL 배열은 1부터
+        cams = conn.execute("SELECT lon, lat FROM cameras").fetchall()
+    estimate = None
+    if f:
+        slot, source, v = f
+        v = None if v is None or math.isnan(v) else round(v, 1)
+        estimate = {"pm25": v, "grade": grade(v), "slot": iso(slot), "source": source,
+                    "nearest_cctv_km": round(min(math.hypot((lon - x) * KX, (lat - y) * KY) for x, y in cams), 1)}
+    # station(가까운 측정소 실측)은 에어코리아 수집 뒤에 채운다. 화면은 null이면 "아직 제공하지 않습니다"로 보여 준다
+    return {"inside": True, "gu": gu, "grid_id": grid_id, "estimate": estimate, "station": None}
+
+
+@app.get("/api/health")
+def health():
+    with connect() as conn:
+        last_slot, last_received = conn.execute("SELECT max(slot), max(received_at) FROM estimates").fetchone()
+    t = now()
+    # 밤에는 추정기가 쉬므로 제외. 해 뜬 직후 40분은 첫 회차를 기다리는 중이라 제외
+    stale = is_day(t) and is_day(t - STALE_AFTER) and (last_received is None or t - last_received > STALE_AFTER)
+    return {"last_slot": iso(last_slot), "last_received_at": iso(last_received), "stale": stale}
