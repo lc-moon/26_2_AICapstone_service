@@ -1,9 +1,9 @@
 {
  "inside": true,
  "gu": "연수구",
- "grid_id": 38,
+ "grid_id": 52,
  "estimate": {
-  "pm25": 13.3,
+  "pm25": 13.2,
   "grade": "좋음",
   "slot": "2026-10-16T13:20:00+09:00",
   "source": "cctv",
