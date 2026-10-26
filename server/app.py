@@ -1,15 +1,19 @@
 """인천 초미세먼지 지도 API. 실행: uvicorn app:app --reload (server/ 에서)"""
+import asyncio
 import hmac
 import json
 import math
 import os
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Annotated, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
+import airkorea
 from idw import KX, KY, idw
 from init_db import SHARED, connect
 from sun import is_day
@@ -19,7 +23,29 @@ METHOD = "idw 1/(d²+0.05)"
 STALE_AFTER = timedelta(minutes=40)   # 낮에 2회차(40분) 동안 추정값이 하나도 안 오면 stale
 GRADES = [(15, "좋음"), (35, "보통"), (75, "나쁨")]   # 반올림 후 판정, 그 위는 매우나쁨
 
-app = FastAPI(title="인천 초미세먼지 지도")
+
+@asynccontextmanager
+async def lifespan(app):
+    task = None
+    if os.environ.get("AIRKOREA_API_KEY"):
+        task = asyncio.create_task(airkorea.run_hourly())
+    else:
+        airkorea.log.warning("AIRKOREA_API_KEY가 없어 에어코리아 매시 수집을 켜지 않습니다")
+    app.state.airkorea_task = task
+    yield
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="인천 초미세먼지 지도", lifespan=lifespan)
+# 로컬 개발용: 화면(localhost:8766)이 API(localhost:8000)를 부를 때. 배포는 같은 주소라 필요 없음
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["GET"],
+)
 
 
 def iso(dt):

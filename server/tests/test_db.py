@@ -150,3 +150,10 @@ def test_health(client, db, monkeypatch):
     assert client.get("/api/health").json()["stale"] is False             # 밤
     at(2026, 10, 17, 6, 50)
     assert client.get("/api/health").json()["stale"] is False             # 해 뜬 직후 40분은 기다린다
+
+
+def test_cors_on_real_endpoint(client, db):
+    # NEXT.md 1번 완료 기준: 프레임이 없을 때(404)도 허용된 출처면 헤더가 붙어야 화면이 404를 읽을 수 있음
+    r = client.get("/api/frames/latest", headers={"Origin": "http://localhost:8766"})
+    assert r.status_code == 404 and r.headers["access-control-allow-origin"] == "http://localhost:8766"
+    assert "access-control-allow-origin" not in client.get("/api/frames/latest", headers={"Origin": "http://evil.example"}).headers
