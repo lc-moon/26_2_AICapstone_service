@@ -3,6 +3,31 @@
 사람이 읽어도 되고, AI 코딩 도구에 **이 파일과 [AGENTS.md](../AGENTS.md)를 같이 읽히고** "NEXT.md의 1번부터 해 줘"라고 시키면 됩니다.
 한 번에 한 항목씩, 항목마다 PR 하나가 좋습니다(브랜치·PR 방법은 [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
+## 먼저 읽기: 10/26~27에 팀장이 바꾼 것 (승진 님 시험기간이라 대신 진행)
+
+| PR | 바뀐 것 | 승진 님이 할 것 |
+|---|---|---|
+| #4 (`683564a`) | 서비스 범위에 매립지 추가, **격자 388 → 456칸**, `test_db.py`의 388 → 456 | 로컬 DB에서 `python init_db.py` 다시 |
+| #5 (`77b9fbb`) | `app.py`에 `GET /api/point`(추정값까지, `station`은 null)·`GET /api/health`, `sun.py`(낮·밤), 테스트 11개, 이 문서 | 아래 "브랜치 합치기" |
+| (main 직접) | `server/README.md`에 "배포" 절 | — |
+| 배포 | **https://incheon-air.duckdns.org** 에 이미 올라가 있음(수집 VM). `main`에 머지되면 팀장이 서버에 반영 | — |
+
+**`server/airkorea-ingest` 브랜치 합치기** — 이 브랜치는 #5 전 `main`에서 갈라져서 `server/app.py`·`server/README.md`가 충돌합니다. 둘 다 살리면 됩니다.
+
+```bash
+git switch server/airkorea-ingest
+git fetch origin && git merge origin/main
+# server/app.py: import는 양쪽 모두 남기기(asyncio·contextlib·airkorea + Query·KX, KY·sun.is_day).
+#                lifespan과 app = FastAPI(..., lifespan=lifespan)은 승진 님 것, 그 아래 STALE_AFTER·GRADES·point·health는 main 것
+# server/README.md: "구현된 API" 표는 양쪽 행을 모두, "배포" 절은 main 것 그대로
+pytest                                    # DB까지 돌려서 전부 통과하면
+git add server && git commit && git push  # 그다음 PR
+```
+
+- 에어코리아 수집이 API 프로세스 안에서 돌기 때문에, 배포 서버 `.env`에 `AIRKOREA_API_KEY`가 있어야 켜집니다. **키는 단톡이 아니라 팀장에게 개인 메시지로** 보내 주세요
+- 수집이 머지되면 다음은 아래 3번(`/api/point`의 `station`)입니다. 지금 `point()` 맨 끝의 `"station": None` 자리입니다
+- 1번(CORS)은 아직 안 됐습니다. 작으니 이 PR에 같이 넣어도 됩니다
+
 ## 지금 상태
 
 | 된 것 | 파일 | 누가 |
