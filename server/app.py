@@ -1,8 +1,10 @@
 """인천 초미세먼지 지도 API. 실행: uvicorn app:app --reload (server/ 에서)"""
+import asyncio
 import hmac
 import json
 import math
 import os
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Annotated, Optional
@@ -10,13 +12,30 @@ from typing import Annotated, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
+import airkorea
 from idw import idw
 from init_db import SHARED, connect
 
 KST = timezone(timedelta(hours=9))
 METHOD = "idw 1/(d²+0.05)"
 
-app = FastAPI(title="인천 초미세먼지 지도")
+
+@asynccontextmanager
+async def lifespan(app):
+    task = None
+    if os.environ.get("AIRKOREA_API_KEY"):
+        task = asyncio.create_task(airkorea.run_hourly())
+    else:
+        airkorea.log.warning("AIRKOREA_API_KEY가 없어 에어코리아 매시 수집을 켜지 않습니다")
+    app.state.airkorea_task = task
+    yield
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="인천 초미세먼지 지도", lifespan=lifespan)
 
 
 def iso(dt):
