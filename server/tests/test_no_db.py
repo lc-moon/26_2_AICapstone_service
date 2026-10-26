@@ -65,3 +65,25 @@ def test_no_token_configured_rejects_all(client, monkeypatch):
 ])
 def test_invalid_body_422(client, body):
     assert client.post("/api/ingest/estimates", json=body, headers=AUTH).status_code == 422
+
+
+def test_point_outside_needs_no_db(client):
+    assert client.get("/api/point", params={"lon": 126.40, "lat": 37.45}).json() == {"inside": False}   # 영종 앞바다
+
+
+@pytest.mark.parametrize("params", [{}, {"lon": 126.7}, {"lon": "x", "lat": 37.4}, {"lon": 200, "lat": 37.4}])
+def test_point_bad_params_422(client, params):
+    assert client.get("/api/point", params=params).status_code == 422
+
+
+def test_grade_rounds_first():
+    from app import grade
+    assert [grade(v) for v in (None, 15.49, 15.5, 35.5, 75.49, 75.5)] == [None, "좋음", "보통", "나쁨", "나쁨", "매우나쁨"]
+
+
+def test_day_night():
+    from datetime import datetime, timedelta, timezone
+    from sun import is_day
+    kst = timezone(timedelta(hours=9))
+    assert is_day(datetime(2026, 10, 16, 13, 20, tzinfo=kst))
+    assert not is_day(datetime(2026, 10, 16, 22, 0, tzinfo=kst))
