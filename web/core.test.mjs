@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {gradeOf,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
+const read=n=>JSON.parse(readFileSync(new URL('../shared/mock/'+n+'.json',import.meta.url)));
+const grid=read('grid'),day=read('frames_latest'),night=read('frames_latest_night');
+test('388 cells and both fixtures obey the response contract',()=>{assert.equal(grid.cells.length,388);for(const f of [day,night])assert.equal(validateFrame(f,388),f);});
+test('round before grading at every threshold',()=>{for(const [v,g] of [[15.49,'좋음'],[15.5,'보통'],[35.49,'보통'],[35.5,'나쁨'],[75.49,'나쁨'],[75.5,'매우나쁨']])assert.equal(gradeOf(v).name,g);});
+test('all cell centers map back to their API array index',()=>{const layout=gridLayout(grid.cells);grid.cells.forEach((c,i)=>assert.equal(cellAt(c.center,grid.cells,layout),i));});
+test('polygon holes and outside locations excluded',()=>{const g={type:'Polygon',coordinates:[[[0,0],[5,0],[5,5],[0,5],[0,0]],[[1,1],[2,1],[2,2],[1,2],[1,1]]]};assert(inside([3,3],g));assert(!inside([1.5,1.5],g));assert(!inside([6,6],g));assert(!inside([127,37.5],grid.boundary));});
+test('same slot updated_at change triggers repaint',()=>{assert(!frameChanged(day,{...day}));assert(frameChanged(day,{...day,updated_at:'2026-10-16T13:35:00+09:00'}));assert(frameChanged(day,night));});
+test('null accepted; malformed and mismatched frames rejected',()=>{assert.doesNotThrow(()=>validateFrame({...day,values:Array(388).fill(null)},388));for(const values of [[],Array(388).fill(-1),Array(388).fill('12'),Array(388).fill(NaN)])assert.throws(()=>validateFrame({...day,values},388));});
+test('time uses Seoul even with UTC input',()=>{assert.match(formatTime('2026-10-16T04:20:00Z'),/13:20/);assert.equal(formatTime(null),'기준 시각 없음');});
