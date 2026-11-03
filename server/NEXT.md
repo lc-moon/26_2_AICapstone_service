@@ -34,6 +34,7 @@
   - 밤(`sun.py`의 `is_day()`가 false)에는 매시 실측을 받은 뒤 **정시 슬롯**으로 측정소 프레임을 만듦: `source='station'`, `basis_time`=그 실측의 `data_time`
   - 낮인데 회차 값이 전부 null이면 그 회차를 측정소 값으로(`basis_time` 채움)
   - 보간은 CCTV와 같은 IDW, 입력은 그 시각에 값이 있는 측정소들
+  - `frames`의 키는 `slot` 하나뿐입니다. 낮에 측정소로 대신 만든 회차에 나중에 CCTV 값이 오면(습도 결측 행은 약 1시간 뒤에 옴) **CCTV 프레임으로 바꿔야** 합니다. 지금 `rebuild_frame()`은 `source='cctv'` 행만 지우고 넣으므로 그대로 두면 키가 겹쳐 오류
 - 화면은 이미 `source: station`을 "밤·결측 대체 · 측정소 실측 기반"으로 그립니다. 정확히 "밤"이라고 쓰고 싶으면 응답에 밤 여부를 더하는 것을 금혁 님·팀장과 정하고 AGENTS.md부터 고칩니다
 - 완료 기준: `shared/mock/frames_latest_night.json`과 같은 모양의 프레임이 생기고 `/api/frames/latest`에 나오는 테스트
 
@@ -42,7 +43,7 @@
 - 모양: `shared/mock/point_inside.json`의 `camera`
   - `camera_id`, `name`: 클릭한 점에서 가장 가까운 카메라(`cameras` 표, **`grid_id`가 있는 카메라만** — 103번 강화는 범위 밖이라 제외). 거리는 `idw.py`의 `KX`·`KY`, 소수 첫째 자리
   - `slot`, `captured_at`, `pm25`(= `pm25_est`), `status`: 그 카메라의 **가장 최근** `estimates` 한 줄. 밤에는 마지막 낮 회차가 그대로 나옴(정상)
-  - `photo_url`: `"/cam/{camera_id}.jpg?v={captured_at을 숫자만}"` (예: `/cam/10042.jpg?v=20261016132126`). `?v=`는 브라우저가 옛 사진을 캐시하지 않게
+  - `photo_url`: `"/cam/{camera_id}.jpg?v={captured_at을 숫자만}"` (예: `/cam/10042.jpg?v=20261016132126`). `?v=`는 브라우저가 옛 사진을 캐시하지 않게(한국 시각 기준)
   - 그 카메라 행이 하나도 없으면 `camera: null`
 - 같은 이유로 `estimate.nearest_cctv_km`는 그대로 둡니다(값이 같아도 됨)
 - 완료 기준: 추정값 몇 줄을 넣고, 가장 가까운 카메라·가장 최근 행·`photo_url`을 고르는 테스트
@@ -55,6 +56,7 @@
   - 종료 코드가 0이 아니면 실패(표준에러에 이유)
   - 로컬 개발용으로는 `tests/fake_infer.py`처럼 `shared/mock/infer_ok.json`을 그대로 출력하는 가짜 명령을 만들어 `INFER_CMD`에 넣고 개발
 - 백엔드가 지킬 것:
+  - `INFER_CMD` 이름을 `server/.env.example`에 더하기(값은 비워 둠)
   - `camera_id`는 `cameras` 표에 있는 것만(아니면 404). **명령에 넘기기 전에 반드시 확인**(공개 주소라 아무 문자열이나 들어올 수 있음). `shell=True` 쓰지 않기
   - **한 번에 하나만**: 진행 중이면 409 `{"detail": "다른 추정이 진행 중입니다. 잠시 뒤 다시 눌러 주세요"}` (`shared/mock/infer_busy.json`)
   - **같은 카메라를 60초 안에 다시 누르면 명령을 다시 돌리지 않고** 지난 결과를 `cached: true`로
@@ -63,7 +65,7 @@
   - 결과는 DB(`estimates`, `frames`)에 **넣지 않습니다**(시연용)
   - 로컬 개발용 CORS가 지금 `GET`만 허용하면 `POST`를 더합니다
 - 완료 기준: 가짜 명령으로 ① 정상 ② 없는 카메라 404 ③ 동시에 두 번 → 하나는 409 ④ 60초 안 재요청은 `cached: true` ⑤ 명령 실패 503 테스트
-- 이 항목은 팀장이 VM에서 측정(11/3)해 보고 너무 느리면 빠질 수 있습니다. 결과는 단톡에 알립니다
+- 이 항목은 팀장이 VM에서 측정해 보고 너무 느리면 빠질 수 있습니다. 결과는 단톡에 알립니다
 
 ### 5. 전시용 `?source=cctv` (S10) — **맨 마지막. 못 해도 됩니다**
 - 왜: 전시가 해 진 뒤라도 그날 마지막 낮 CCTV 회차를 보여 주려고. 실서비스 화면은 그대로입니다

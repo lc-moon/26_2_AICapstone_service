@@ -13,7 +13,8 @@
 
 ### 1. 근거 패널: 추정값 · 측정소 실측 · CCTV 사진 나란히 (S4)
 - 왜: 교수님 피드백이 "이 예측 농도가 어떻게 나온 거냐"였습니다. 패널 하나로 **CCTV 사진 → 모델 추정값, 그리고 근처 측정소 실측**을 같이 보여 줘서 답합니다
-- 데이터: `/api/point`의 `camera` (`shared/mock/point_inside.json`). 사진은 `photo_url`(mock에서는 `shared/mock/cam/10042.jpg`)
+- 데이터: `/api/point`의 `camera` (`shared/mock/point_inside.json`). 사진은 `photo_url`
+  - `photo_url`은 `/cam/…`으로 시작하는 서버 기준 주소입니다. 배포 서버(같은 주소)에서는 그대로, `?api=http://localhost:8000`처럼 API 주소를 따로 줄 때는 그 앞에 붙이고, mock에서는 `/cam/` → `../shared/mock/cam/`으로 바꿔 씀
 - 보여 줄 것
   - 사진 위쪽 60%(모델이 보는 곳)에 **붉은 테두리**, 그 **좌상단에 작은 네모 라벨 "ROI"**. 우상단에는 CCTV 자체 날짜·시각 글자가 있어 피함. 사진 파일에 그리지 말고 화면에서 겹쳐 그리기(CSS나 canvas). 완성 모양 참고: `shared/mockup/roi_example.jpg`
   - 아래 40%는 이미 모자이크돼서 오므로 브라우저에서 따로 가리지 않음
