@@ -1,6 +1,6 @@
 # shared — 공통 자료
 
-A(백엔드)·B(프론트)가 같이 쓰는 파일입니다. 규칙과 할 일은 [AGENTS.md](../AGENTS.md) 또는 [Notion 가이드](https://app.notion.com/p/A-B-3fd4a3212e4f81458cd8f40cff41cad5)를 보세요.
+A(백엔드)·B(프론트)가 같이 쓰는 파일입니다. 규칙과 할 일은 [AGENTS.md](../AGENTS.md)를 보세요.
 팀장 저장소의 `Tools/make_service_shared.py`가 만든 것이라 **직접 고치지 말고** 필요하면 팀장에게 말해 주세요.
 
 | 파일 | 내용 |
