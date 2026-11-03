@@ -1,0 +1,12 @@
+{
+ "camera_id": "10042",
+ "name": "송도-스마트밸리#2",
+ "requested_at": "2026-10-16T13:33:02+09:00",
+ "captured_at": "2026-10-16T13:33:05+09:00",
+ "pm25": 14.1,
+ "grade": "좋음",
+ "status": "정상",
+ "photo_url": "/cam/live/10042.jpg?v=20261016133305",
+ "cached": false,
+ "elapsed_s": 8.4
+}
