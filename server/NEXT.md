@@ -31,8 +31,8 @@
 ### 2. 밤·빈 회차를 측정소 값으로 (S2) — **밤 화면의 안전장치라 꼭**
 - 지금: 회차 값이 전부 `null`이면 그 회차 프레임을 안 만듭니다. 밤에는 추정기가 쉬어서 마지막 낮 값이 남아 있습니다(화면에 "n시간 전"으로 보임)
 - 할 것(AGENTS.md "계산 규칙"):
-  - 밤(`sun.py`의 `is_day()`가 false)에는 매시 실측을 받은 뒤 **정시 슬롯**으로 측정소 프레임을 만듦: `source='station'`, `basis_time`=그 실측의 `data_time`
-  - 낮인데 회차 값이 전부 null이면 그 회차를 측정소 값으로(`basis_time` 채움)
+  - 밤(`sun.py`의 `is_day()`가 false)에는 매시 실측을 받은 뒤(`airkorea.py`가 매시 50분에 받음) 측정소 프레임을 만듦: `slot` = `basis_time` = 그 실측의 `data_time`(정시), `source='station'`
+  - 낮인데 회차 값이 전부 null이면 그 회차(`slot`은 그 20분 회차)를 그때 가장 최근 실측으로 계산하고 `basis_time`에 그 실측의 `data_time`
   - 보간은 CCTV와 같은 IDW, 입력은 그 시각에 값이 있는 측정소들
   - `frames`의 키는 `slot` 하나뿐입니다. 낮에 측정소로 대신 만든 회차에 나중에 CCTV 값이 오면(습도 결측 행은 약 1시간 뒤에 옴) **CCTV 프레임으로 바꿔야** 합니다. 지금 `rebuild_frame()`은 `source='cctv'` 행만 지우고 넣으므로 그대로 두면 키가 겹쳐 오류
 - 화면은 이미 `source: station`을 "밤·결측 대체 · 측정소 실측 기반"으로 그립니다. 정확히 "밤"이라고 쓰고 싶으면 응답에 밤 여부를 더하는 것을 금혁 님·팀장과 정하고 AGENTS.md부터 고칩니다
@@ -51,6 +51,7 @@
 ### 4. 직접 해보기 `POST /api/infer?camera_id=` (S5)
 - 왜: 전시에서 버튼을 누르면 그 카메라의 **지금** 사진으로 추정합니다. 실제 사진 찍기·추정은 팀장이 만드는 명령이 하고, 백엔드는 그 명령을 안전하게 부르는 입구입니다
 - 명령 약속 (팀장이 만듦): `.env`의 `INFER_CMD`에 적힌 명령 뒤에 카메라 번호를 붙여 실행 → **표준출력에 JSON 한 줄**, 종료 코드 0
+  - `INFER_CMD`는 `shlex.split()`으로 나눈 뒤 카메라 번호를 덧붙여 `subprocess`/`asyncio.create_subprocess_exec`로 실행(셸 안 씀)
   - 예: `INFER_CMD="/home/.../venv/bin/python /home/.../Estimator/infer_now.py"` → `... infer_now.py 10042`
   - 출력 필드: `camera_id`, `requested_at`, `captured_at`, `pm25`(없으면 null), `status`, `photo_url`. 비·습도·밤이면 `pm25: null`이고 `status`에 이유 문장
   - 종료 코드가 0이 아니면 실패(표준에러에 이유)
