@@ -34,7 +34,12 @@
   - 밤(`sun.py`의 `is_day()`가 false)에는 매시 실측을 받은 뒤(`airkorea.py`가 매시 50분에 받음) 측정소 프레임을 만듦: `slot` = `basis_time` = 그 실측의 `data_time`(정시), `source='station'`
   - 낮인데 회차 값이 전부 null이면 그 회차(`slot`은 그 20분 회차)를 그때 가장 최근 실측으로 계산하고 `basis_time`에 그 실측의 `data_time`
   - 보간은 CCTV와 같은 IDW, 입력은 그 시각에 값이 있는 측정소들
-  - `frames`의 키는 `slot` 하나뿐입니다. 낮에 측정소로 대신 만든 회차에 나중에 CCTV 값이 오면(습도 결측 행은 약 1시간 뒤에 옴) **CCTV 프레임으로 바꿔야** 합니다. 지금 `rebuild_frame()`은 `source='cctv'` 행만 지우고 넣으므로 그대로 두면 키가 겹쳐 오류
+  - **주의: `frames`는 회차(`slot`)마다 한 줄뿐입니다.** CCTV 프레임과 측정소 프레임이 같은 `slot`을 두고 부딪칠 수 있습니다
+    - CCTV가 이깁니다. 측정소로 대신 만든 낮 회차에 나중에 CCTV 값이 오면(습도 결측 행은 약 1시간 뒤에 옴) CCTV 프레임으로 바뀌어야 합니다. 지금 `rebuild_frame()`은 `ON CONFLICT (slot) DO UPDATE`라 이미 그렇게 됩니다. **이 부분은 바꾸지 마세요**
+    - 반대로 **측정소 프레임을 넣는 코드는 이미 있는 CCTV 프레임을 덮어쓰면 안 됩니다**(예: 해 뜰 무렵 07:00은 정시 측정소 슬롯이자 CCTV 회차). `ON CONFLICT (slot) DO UPDATE ... WHERE frames.source = 'station'`처럼 측정소 프레임끼리만 덮어쓰기
+    - 낮 빈 회차는 `rebuild_frame()`의 "값이 하나도 없음" 갈래(지금은 CCTV 프레임을 지우고 끝)에서 측정소 프레임을 만들면 됩니다
+    - 이 처리는 추정값 수신(`/api/ingest/estimates`)과 같은 트랜잭션 안에서 돕니다. 여기서 오류가 나면 **수신 전체가 실패해 낮 지도가 멈춥니다**
+  - 테스트에 꼭 넣을 것: ① 측정소 프레임이 있는 회차에 CCTV 값이 오면 CCTV로 바뀜 ② CCTV 프레임이 있는 회차에 측정소 프레임을 만들려 하면 CCTV가 그대로 ③ 둘 다 오류 없이
 - 화면은 이미 `source: station`을 "밤·결측 대체 · 측정소 실측 기반"으로 그립니다. 정확히 "밤"이라고 쓰고 싶으면 응답에 밤 여부를 더하는 것을 금혁 님·팀장과 정하고 AGENTS.md부터 고칩니다
 - 완료 기준: `shared/mock/frames_latest_night.json`과 같은 모양의 프레임이 생기고 `/api/frames/latest`에 나오는 테스트
 
