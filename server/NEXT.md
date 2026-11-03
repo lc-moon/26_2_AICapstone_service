@@ -56,10 +56,10 @@
 ### 4. 직접 해보기 `POST /api/infer?camera_id=` (S5)
 - 왜: 전시에서 버튼을 누르면 그 카메라의 **지금** 사진으로 추정합니다. 실제 사진 찍기·추정은 팀장이 만드는 명령이 하고, 백엔드는 그 명령을 안전하게 부르는 입구입니다
 - 명령 약속 (팀장이 만듦): `.env`의 `INFER_CMD`에 적힌 명령 뒤에 카메라 번호를 붙여 실행 → **표준출력에 JSON 한 줄**, 종료 코드 0
-  - `INFER_CMD`는 `shlex.split()`으로 나눈 뒤 카메라 번호를 덧붙여 `subprocess`/`asyncio.create_subprocess_exec`로 실행(셸 안 씀)
+  - `INFER_CMD`는 `shlex.split()`으로 나눈 뒤 카메라 번호를 덧붙여 실행(셸 안 씀). **12초쯤 걸리므로 다른 API가 그동안 멈추지 않게**: `async def`면 `asyncio.create_subprocess_exec`, 보통 `def`면 `subprocess.run`(FastAPI가 별도 스레드에서 돌림). `async def` 안에서 `subprocess.run`을 쓰면 서버 전체가 12초 멈춥니다
   - 예: `INFER_CMD="/home/.../venv/bin/python /home/.../Estimator/infer_now.py"` → `... infer_now.py 10042`
   - 출력 필드: `camera_id`, `requested_at`, `captured_at`, `pm25`(없으면 null), `status`, `photo_url`. 비·습도·밤이면 `pm25: null`이고 `status`에 이유 문장
-  - 종료 코드가 0이 아니면 실패(표준에러에 이유)
+  - 종료 코드 **75 = 정기 추정기가 돌고 있어 지금은 못 함** → 409(진행 중과 같은 응답). 그 밖에 0이 아니면 실패(표준에러에 이유) → 503
   - 로컬 개발용으로는 `tests/fake_infer.py`처럼 `shared/mock/infer_ok.json`을 그대로 출력하는 가짜 명령을 만들어 `INFER_CMD`에 넣고 개발
 - 백엔드가 지킬 것:
   - `INFER_CMD` 이름을 `server/.env.example`에 더하기(값은 비워 둠)
@@ -70,7 +70,7 @@
   - 응답 = 명령 출력 + `name`(카메라 이름) + `grade`(등급 규칙 그대로, `pm25`가 null이면 null) + `cached` + `elapsed_s`(소수 첫째 자리). 모양은 `shared/mock/infer_ok.json`·`infer_rain.json`
   - 결과는 DB(`estimates`, `frames`)에 **넣지 않습니다**(시연용)
   - 로컬 개발용 CORS가 지금 `GET`만 허용하면 `POST`를 더합니다
-- 완료 기준: 가짜 명령으로 ① 정상 ② 없는 카메라 404 ③ 동시에 두 번 → 하나는 409 ④ 60초 안 재요청은 `cached: true` ⑤ 명령 실패 503 테스트
+- 완료 기준: 가짜 명령으로 ① 정상 ② 없는 카메라 404 ③ 동시에 두 번 → 하나는 409 ④ 60초 안 재요청은 `cached: true` ⑤ 종료 코드 75 → 409 ⑥ 명령 실패 503 ⑦ 추정 중에도 `/api/frames/latest`가 바로 응답 테스트
 - VM 측정 통과: 명령 한 번에 약 12초(사진 받기 4.7 · 모델 불러오기 4.6 · 추정 1.2), 여유 메모리 최저 281MB. 그래서 응답까지 12~15초 걸린다고 보고 제한 시간 30초
 
 ### 5. 전시용 `?source=cctv` (S10) — **맨 마지막. 못 해도 됩니다**
