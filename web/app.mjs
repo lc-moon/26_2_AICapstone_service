@@ -1,3 +1,4 @@
+import {renderEvidence} from './evidence.mjs';
 import {GRADES,gradeOf,rgb,validValue,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
 import {cloudImage,veilImage} from './render.mjs';
 const $=id=>document.getElementById(id), params=new URLSearchParams(location.search);
@@ -46,26 +47,13 @@ async function refresh(){
  finally{busy=false;showStatus();}
 }
 function text(tag,content,cls){const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el;}
-function displayPoint(data){
- const host=$('details');host.replaceChildren();
- host.append(text('div',`${data.gu||'선택한 위치'} 부근`,'place'));
- const e=data.estimate,v=e?.pm25,valid=validValue(v),g=valid?gradeOf(v):null;
- const number=text('div',valid?String(Math.round(v)):'—','value');number.append(text('small','㎍/㎥'));host.append(number);
- const badge=text('span',g?.name||'값 없음','badge');badge.style.background=g?rgb(g.light):'#e5eae9';host.append(badge);
- host.append(text('p',`${e?.source==='station'?'측정소 실측 기반 보간':'CCTV 기반 추정'} · ${formatTime(e?.slot)}`));
- host.append(document.createElement('hr'),text('p','가까운 측정소 실측'));
- const s=data.station;
- if(s){host.append(text('div',`${s.name} · ${validValue(s.pm25)?Math.round(s.pm25)+' ㎍/㎥':'값 없음'}`,'station'),text('p',`${formatTime(s.data_time)} · ${s.period||'평균 시간 정보 없음'}${Number.isFinite(s.distance_km)?' · '+s.distance_km.toFixed(1)+'km':''}`));}
- else host.append(text('p','측정소 실측값을 아직 제공하지 않습니다.'));
- host.append(text('p','추정 농도와 측정소 실측값은 위치와 평균 시간이 달라 차이가 날 수 있습니다.'));
- if(mock)host.append(text('p','MOCK: 격자 추정값을 사용합니다. 측정소 실측은 예시이며 클릭 위치의 실제 관측이 아닙니다.'));
-}
+function displayPoint(data){renderEvidence($('details'),data,{mock,base});}
 async function getPoint(p){
  if(!mock)return json(`${base}/api/point?${new URLSearchParams({lon:p[0],lat:p[1]})}`,{allow404:true});
  const idx=cellAt(p,grid.cells,layout),cell=grid.cells[idx];
  // Only the supplied sample cell has a station comparison fixture. Never invent observations.
  const sample=await fixture('point_inside');
- return {inside:true,gu:cell?.gu,estimate:{pm25:idx<0?null:current?.values[idx]??null,slot:current?.slot,source:current?.source},station:cell?.grid_id===sample.grid_id?sample.station:null};
+ return {inside:true,gu:cell?.gu,estimate:{pm25:idx<0?null:current?.values[idx]??null,slot:current?.slot,source:current?.source},station:cell?.grid_id===sample.grid_id?sample.station:null,camera:cell?.grid_id===sample.grid_id?sample.camera:null};
 }
 async function selectPoint(p,fly=true){
  if(!inside(p,grid.boundary)){notify('인천 내륙과 송도 안의 위치를 선택해 주세요.');return;}
@@ -111,7 +99,7 @@ async function start(){
    const building=layers.find(l=>l.type==='fill-extrusion')?.id;
    map.addLayer({id:'cloud',type:'raster',source:'cloud',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],10,.9,15,.5,17,.25],'raster-fade-duration':0}},building||labels);
    map.addSource('pick',{type:'geojson',data:empty});map.addLayer({id:'pick',type:'circle',source:'pick',paint:{'circle-radius':7,'circle-color':'#235954','circle-stroke-color':'#fff','circle-stroke-width':3}});
-   map.on('click',e=>void selectPoint([e.lngLat.lng,e.lngLat.lat]));wire();home();
+   map.on('click',e=>void selectPoint([e.lngLat.lng,e.lngLat.lat]));wire();home();if(mock&&params.has('sample')){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}
   });
   await refresh();timer=setInterval(()=>void refresh(),60000);
  }catch(e){loadIssue=`화면을 불러올 수 없습니다. ${e.message}`;showStatus();$('retry').onclick=()=>location.reload();}
