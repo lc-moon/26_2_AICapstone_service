@@ -2,7 +2,9 @@ import {formatTime} from './core.mjs';
 export function apiPath(path,{expo=false,query={}}={}){
  const params=new URLSearchParams(query);
  if(expo&&['/api/frames/latest','/api/point'].includes(path))params.set('source','cctv');
- return path+(params.size?'?'+params:'');
+ // URLSearchParams.size는 Safari 17 미만에 없어 toString()으로 판단
+ const q=params.toString();
+ return path+(q?'?'+q:'');
 }
 export function expoLabel(frame){
  if(!frame)return '전시용 · CCTV 회차 없음';
