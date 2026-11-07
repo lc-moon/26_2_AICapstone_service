@@ -244,14 +244,34 @@ def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90)
         f = conn.execute("SELECT slot, source, values[%s] FROM frames ORDER BY slot DESC LIMIT 1",
                          (grid_id + 1,)).fetchone()   # PostgreSQL 배열은 1부터
         cams = conn.execute("SELECT lon, lat FROM cameras").fetchall()
+        station = nearest_station(conn, lon, lat)
     estimate = None
     if f:
         slot, source, v = f
         v = None if v is None or math.isnan(v) else round(v, 1)
         estimate = {"pm25": v, "grade": grade(v), "slot": iso(slot), "source": source,
                     "nearest_cctv_km": round(min(math.hypot((lon - x) * KX, (lat - y) * KY) for x, y in cams), 1)}
-    # station(가까운 측정소 실측)은 에어코리아 수집 뒤에 채운다. 화면은 null이면 "아직 제공하지 않습니다"로 보여 준다
-    return {"inside": True, "gu": gu, "grid_id": grid_id, "estimate": estimate, "station": None}
+    return {"inside": True, "gu": gu, "grid_id": grid_id, "estimate": estimate, "station": station}
+
+
+def period(t):
+    """data_time(구간 끝) → '12~13시 평균'. 00:00은 전날 23~24시"""
+    h = t.astimezone(KST).hour or 24
+    return f"{h - 1}~{h}시 평균"
+
+
+def nearest_station(conn, lon, lat):
+    """가장 가까운 비교용 측정소의 가장 최근 실측 한 줄(NEXT.md S1).
+    그 줄이 결측(null)이면 pm25 null — 더 이전 시각이나 다른 측정소로 메우지 않는다"""
+    rows = conn.execute("SELECT station_name, lon, lat FROM stations WHERE use_for_compare").fetchall()
+    if not rows:
+        return None
+    d, name = min((math.hypot((lon - x) * KX, (lat - y) * KY), n) for n, x, y in rows)
+    t, pm = conn.execute("SELECT data_time, pm25 FROM observations WHERE station_name = %s"
+                         " ORDER BY data_time DESC LIMIT 1", (name,)).fetchone() or (None, None)
+    return {"name": name, "distance_km": round(d, 1),
+            "pm25": None if pm is None or math.isnan(pm) else round(pm, 1),
+            "data_time": iso(t), "period": period(t) if t else None}
 
 
 @app.get("/api/health")

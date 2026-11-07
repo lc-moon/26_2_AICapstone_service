@@ -65,7 +65,7 @@ TEST_DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/pm_map_test 
 | `POST /api/ingest/estimates` | 토큰이 틀리면 401, 형식이 틀리면 422(시각은 `+09:00` 같은 시간대 필수, `slot`은 :00/:20/:40). 같은 (camera_id, slot)은 덮어쓰고, 들어온 회차의 프레임을 그 회차 값 전부로 다시 계산 |
 | `GET /api/grid` | `shared/mock/grid.json`과 같은 모양. `boundary`는 `shared/boundary.geojson`의 `area` |
 | `GET /api/frames/latest` | 가장 최근 회차. 프레임이 하나도 없으면 404 |
-| `GET /api/point?lon=&lat=` | 범위 밖(`boundary.geojson`의 `area` 밖)이면 `{"inside": false}`. 안이면 그 칸의 최신 프레임 값·등급·회차·가장 가까운 CCTV 거리. 프레임이 없으면 `estimate: null`. **`station`은 아직 `null`**(에어코리아 수집 뒤 채움) |
+| `GET /api/point?lon=&lat=` | 범위 밖(`boundary.geojson`의 `area` 밖)이면 `{"inside": false}`. 안이면 그 칸의 최신 프레임 값·등급·회차·가장 가까운 CCTV 거리. 프레임이 없으면 `estimate: null`. `station` = 가장 가까운 비교용(`use_for_compare`) 측정소의 가장 최근 실측 한 줄. 그 줄이 결측이면 `pm25: null`(이전 시각·다른 측정소로 메우지 않음). 측정값이 하나도 없으면 `pm25`·`data_time`·`period`가 `null` |
 | `GET /api/health` | `last_slot`, `last_received_at`, `stale`. stale = 낮에 40분 넘게 추정값이 안 옴(밤과 해 뜬 직후 40분은 false). 낮·밤은 `sun.py`(수집기와 같은 식) |
 
 수신 응답 예: `{"rows_in":19, "rows_upserted":19, "unknown_cameras":[], "new_models":[], "frames":[{"slot":"2026-10-16T13:20:00+09:00","n_inputs":19}]}`
@@ -118,7 +118,7 @@ python airkorea.py      # 결과 요약 출력. 실제 API를 1회(인천·경�
 화면을 `http://localhost:8766/web/?api=http://localhost:8000`처럼 다른 포트에서 띄워 API를 부를 수 있게,
 `http://localhost:포트`와 `http://127.0.0.1:포트`에서 오는 `GET`만 허용합니다(`*`는 쓰지 않음). 배포 서버는 화면과 API가 같은 주소라 상관없습니다.
 
-아직: `/api/point`의 `station`, 밤·빈 회차 → **이어서 할 일은 [NEXT.md](NEXT.md)**
+아직: 밤·빈 회차 → **이어서 할 일은 [NEXT.md](NEXT.md)**
 
 ## 배포 (2026-10-27, 팀장)
 
