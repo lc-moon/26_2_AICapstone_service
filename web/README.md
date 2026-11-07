@@ -1,7 +1,7 @@
 # 인천 에어맵 — B 프론트
 
 빌드 없는 HTML/CSS/ES modules + MapLibre GL JS 4.7.1 / OpenFreeMap Liberty.
-`web/`만 수정했으며 `shared/`를 읽어서 사용합니다. CCTV 사진·카메라/측정소 위치 마커는 표시하지 않습니다.
+`web/`만 수정했으며 `shared/`를 읽어서 사용합니다. CCTV 사진은 API가 제공한 모자이크 사진만 표시합니다. 카메라/측정소 위치 마커는 표시하지 않습니다.
 
 ## 실행
 
@@ -41,7 +41,7 @@ python3 -m http.server 8766 --bind 127.0.0.1
   정확한 야간 여부는 현 API에 없어서 source만으로 밤이라고 단정하지 않음.
 - health stale 경고, health 미구현/실패는 상태 확인 불가. point 404는 상세 정보 준비 중.
 - 빠른 연속 클릭/닫기 후 늦게 도착한 응답은 무시. 패널 내용은 textContent로 출력.
-- mock 상세는 클릭한 격자의 농도. 측정소 예시 응답은 해당 fixture의 grid_id(38)에만 표시하며
+- mock 상세는 클릭한 격자의 농도. 측정소 예시 응답은 해당 fixture의 grid_id(52)에만 표시하며
   다른 위치에 가짜 관측값/거리를 만들어 붙이지 않습니다. 실제 모드는 point 응답을 사용.
 - 등급은 반올림 후 15/35/75 경계로 판정. 모든 시각은 Asia/Seoul로 표시.
 
@@ -67,3 +67,12 @@ node --check web/render.mjs
 실제 DB/API 통합은 CORS와 point/health 구현 후 별도 확인이 필요합니다.
 
 여유 기능인 기간 애니메이션/장소 검색은 이 PR에 포함하지 않았습니다.
+
+## S4 근거 패널
+
+- `?mode=mock&sample=1`로 송도 예시 칸을 바로 선택합니다. `&scenario=night`도 가능.
+- 추정값, 측정소 실측, 가까운 CCTV를 나란히 표시합니다. camera=null이면 사진 열을 숨깁니다.
+- 촬영 시각과 관측 시각을 별도로 표시하며, 사진의 추정값과 지도 보간값을 구분합니다.
+- 사진은 photo_url의 /cam/ JPG만 사용. API 별도 주소 및 mock 경로 변환, 쿼리 보존.
+- ROI는 위쪽 60% CSS 테두리, 좌상단 라벨. 이미지 오류/추정 결측은 문구로 표시합니다.
+- 실제 서버 station 연결을 확인할 수 있으며 camera는 백엔드 S3 반영 후 확인합니다.
