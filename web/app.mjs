@@ -3,6 +3,7 @@ import {renderEvidence} from './evidence.mjs';
 import {GRADES,gradeOf,rgb,validValue,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
 import {cloudImage,veilImage} from './render.mjs';
 const $=id=>document.getElementById(id), params=new URLSearchParams(location.search);
+$('about-link').href=`about.html${location.search}`;
 const mock=params.get('mode')==='mock', scenario=params.get('scenario')||'day';
 // API base is explicit; production defaults to same-origin and never silently uses mocks.
 const base=(params.get('api')||'').replace(/\/$/,'');
