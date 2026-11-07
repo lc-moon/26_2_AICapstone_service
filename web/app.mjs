@@ -1,3 +1,4 @@
+import {apiPath,expoLabel} from './expo.mjs';
 import {mountSearch} from './search.mjs';
 import {mountInference} from './infer.mjs';
 import {renderEvidence} from './evidence.mjs';
@@ -5,6 +6,7 @@ import {GRADES,gradeOf,rgb,validValue,inside,gridLayout,cellAt,validateFrame,fra
 import {cloudImage,veilImage} from './render.mjs';
 const $=id=>document.getElementById(id), params=new URLSearchParams(location.search);
 $('about-link').href=`about.html${location.search}`;
+const expo=params.get('expo')==='1';
 const mock=params.get('mode')==='mock', scenario=params.get('scenario')||'day';
 // API base is explicit; production defaults to same-origin and never silently uses mocks.
 const base=(params.get('api')||'').replace(/\/$/,'');
@@ -22,15 +24,15 @@ async function json(url,{allow404=false}={}){
  finally{clearTimeout(timeout);}
 }
 const fixture=name=>json(`../shared/mock/${name}.json`);
-async function frameData(){if(mock)return scenario==='empty'?null:fixture(scenario==='night'?'frames_latest_night':'frames_latest');return json(`${base}/api/frames/latest`,{allow404:true});}
+async function frameData(){if(mock)return scenario==='empty'?null:fixture(scenario==='night'&&!expo?'frames_latest_night':'frames_latest');return json(`${base}${apiPath('/api/frames/latest',{expo})}`,{allow404:true});}
 function showStatus(){
  const messages=[loadIssue,healthIssue,mapIssue];
  if(health?.stale){const age=current?Math.max(0,Math.floor((Date.now()-Date.parse(current.slot))/60000)):null;messages.push(mock?'갱신 지연 예시 · 40분 이상 새 추정값이 없습니다.':`갱신 지연 · ${age===null?'40분 이상':age+'분 전'} 값입니다.`);}
  $('status').textContent=messages.filter(Boolean).join('\n');$('status').hidden=!$('status').textContent;
 }
 function ago(t){const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?' · 방금':m<60?` · ${m}분 전`:m<1440?` · ${Math.floor(m/60)}시간 전`:` · ${Math.floor(m/1440)}일 전`;}function updateHeader(){
- if(!current){$('time').textContent='아직 값 없음';$('source').textContent='첫 데이터가 들어오면 자동으로 표시합니다.';return;}
- $('time').textContent=`${formatTime(current.basis_time||current.slot)} 기준${ago(current.basis_time||current.slot)}`;
+ if(!current){$('time').textContent=expo?expoLabel(null):'아직 값 없음';$('source').textContent='첫 데이터가 들어오면 자동으로 표시합니다.';return;}
+ $('time').textContent=expo?expoLabel(current):`${formatTime(current.basis_time||current.slot)} 기준${ago(current.basis_time||current.slot)}`;
  // source=station can also mean daytime missing-camera fallback; do not infer night.
  $('source').textContent=current.source==='station'?`${mock&&scenario==='night'?'밤 · ':'밤·결측 대체 · '}측정소 실측 기반 보간${mock?' · 예시값':''}`:'CCTV 영상 기반 추정 · 20분 회차 / 1분마다 확인';
 }
@@ -53,10 +55,11 @@ async function refresh(){
 function text(tag,content,cls){const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el;}
 function displayPoint(data){
  renderEvidence($('details'),data,{mock,base});
+ if(expo&&data.estimate?.source!=='cctv')$('details').prepend(text('p','전시용 CCTV 상세 미지원 · 응답에 표시된 기준 시각과 출처를 확인해 주세요.','expo-note'));
  if(data.camera)disposeInference=mountInference($('details').querySelector('.evidence-camera'),data.camera,{mock,base,scenario},value=>{inferenceBusy=value;});
 }
 async function getPoint(p){
- if(!mock)return json(`${base}/api/point?${new URLSearchParams({lon:p[0],lat:p[1]})}`,{allow404:true});
+ if(!mock)return json(`${base}${apiPath('/api/point',{expo,query:{lon:p[0],lat:p[1]}})}`,{allow404:true});
  const idx=cellAt(p,grid.cells,layout),cell=grid.cells[idx];
  // Only the supplied sample cell has a station comparison fixture. Never invent observations.
  const sample=await fixture('point_inside');
@@ -74,7 +77,7 @@ async function selectPoint(p,fly=true){
  }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도에서 다시 선택해 주세요.'));}
 }
 function closePanel(){disposeInference();selection=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;map?.getSource('pick')?.setData(empty);}
-function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0}});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(estimate){const p=$('panel');return matchMedia('(max-width:700px)').matches?{top:$('legend').getBoundingClientRect().bottom,left:0,right:0,bottom:(estimate?Math.max(p.offsetHeight,innerHeight*.42):p.offsetHeight)+parseFloat(getComputedStyle(p).bottom)}:{top:0,bottom:0,left:0,right:0};}function settle(){const go=()=>{if(selection)map.easeTo({padding:panelPad(false),duration:300,essential:true});};map.isMoving()?map.once('moveend',go):go();}function closeAndCenter(){const p=selection;closePanel();if(p)map.easeTo({center:p,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});}function home(){closePanel();const mobile=matchMedia('(max-width:700px)').matches,center=mobile?[126.703, 37.474]:[126.69, 37.475];map.easeTo({center,zoom:mobile?10.45+Math.log2(innerWidth/393):fitZoom(center,{top:16,bottom:40,left:16,right:70}),pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});$('view').textContent='2D';$('view').setAttribute('aria-pressed','false');}
+function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0}});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(estimate){const p=$('panel');return matchMedia('(max-width:700px)').matches?{top:$('legend').getBoundingClientRect().bottom,left:0,right:0,bottom:(estimate?Math.max(p.offsetHeight,innerHeight*.42):p.offsetHeight)+parseFloat(getComputedStyle(p).bottom)}:{top:0,bottom:(estimate?Math.max(p.offsetHeight,innerHeight*.35):p.offsetHeight)+parseFloat(getComputedStyle(p).bottom),left:0,right:0};}function settle(){const go=()=>{if(selection)map.easeTo({padding:panelPad(false),duration:300,essential:true});};map.isMoving()?map.once('moveend',go):go();}function closeAndCenter(){const p=selection;closePanel();if(p)map.easeTo({center:p,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});}function home(){closePanel();const mobile=matchMedia('(max-width:700px)').matches,center=mobile?[126.703, 37.474]:[126.69, 37.475];map.easeTo({center,zoom:mobile?10.45+Math.log2(innerWidth/393):fitZoom(center,{top:16,bottom:40,left:16,right:70}),pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});$('view').textContent='2D';$('view').setAttribute('aria-pressed','false');}
 function wire(){
  void mountSearch($('place-search'),{inside:p=>inside(p,grid.boundary),onSelect:p=>void selectPoint(p)});
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
