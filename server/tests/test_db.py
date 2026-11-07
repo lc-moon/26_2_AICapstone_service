@@ -107,13 +107,65 @@ def test_all_null_slot_has_no_frame(client, db):
     assert count(db, "SELECT count(*) FROM estimates") == 19
 
 
+SONGDO = {"lon": 126.6395, "lat": 37.3935}   # 송도 센트럴파크 (mock과 같은 점). 비교용 측정소: 아암 1.43km, 송도 1.84km
+
+
+def obs(db, *rows):
+    """(측정소, data_time, pm25)"""
+    with db.cursor() as cur:
+        cur.executemany("INSERT INTO observations (station_name, data_time, pm25) VALUES (%s, %s, %s)", rows)
+
+
+def station_at(client, params=SONGDO):
+    return client.get("/api/point", params=params).json()["station"]
+
+
 def test_point_matches_mock(client, db):
     post(client, mock("ingest_estimates.json")["rows"])
+    obs(db, ("아암", "2026-10-16T13:00+09", 11), ("아암", "2026-10-16T12:00+09", 30))
     want = mock("point_inside.json")
-    got = client.get("/api/point", params={"lon": 126.6395, "lat": 37.3935}).json()   # 송도 센트럴파크 (mock과 같은 점)
+    got = client.get("/api/point", params=SONGDO).json()
     assert got["inside"] and got["gu"] == want["gu"] and got["grid_id"] == want["grid_id"]
     assert got["estimate"] == want["estimate"]
-    assert got["station"] is None   # 에어코리아 수집 전
+    assert got["station"] == want["station"]   # 가장 가까운 측정소, 가장 최근 시각, 거리 1.43 → 1.4
+
+
+def test_point_station_skips_non_compare(client, db):
+    db.execute("UPDATE stations SET use_for_compare = false WHERE station_name = '아암'")
+    obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 14))
+    s = station_at(client)
+    assert (s["name"], s["distance_km"], s["pm25"]) == ("송도", 1.8, 14)
+
+
+def test_point_station_null_not_filled(client, db):
+    # 아암의 가장 최근(13시)이 결측이면 null. 12시 아암 값이나 13시 송도 값으로 메우지 않는다
+    obs(db, ("아암", "2026-10-16T12:00+09", 30), ("아암", "2026-10-16T13:00+09", None), ("송도", "2026-10-16T13:00+09", 14))
+    assert station_at(client) == {"name": "아암", "distance_km": 1.4, "pm25": None,
+                                  "data_time": "2026-10-16T13:00:00+09:00", "period": "12~13시 평균"}
+
+
+def test_point_station_own_latest_time(client, db):
+    # 측정소마다 마지막 시각이 다르면 가까운 측정소 자신의 마지막 시각. 더 최근인 송도 14시를 쓰지 않는다
+    obs(db, ("아암", "2026-10-16T11:00+09", 20), ("아암", "2026-10-16T12:00+09", 30), ("송도", "2026-10-16T14:00+09", 14))
+    s = station_at(client)
+    assert (s["name"], s["pm25"], s["data_time"], s["period"]) == ("아암", 30, "2026-10-16T12:00:00+09:00", "11~12시 평균")
+
+
+def test_point_station_no_observations(client, db):
+    assert station_at(client) == {"name": "아암", "distance_km": 1.4, "pm25": None, "data_time": None, "period": None}
+
+
+def test_point_station_kst_and_midnight(client, db):
+    obs(db, ("아암", "2026-10-16T15:00Z", 8.25))   # UTC로 넣어도 응답은 +09:00, 17일 00:00 = 16일 23~24시
+    s = station_at(client)
+    assert (s["data_time"], s["period"], s["pm25"]) == ("2026-10-17T00:00:00+09:00", "23~24시 평균", 8.2)
+
+
+def test_point_station_other_place(client, db):
+    obs(db, ("송도", "2026-10-16T13:00+09", 14))
+    # 송도 측정소 바로 옆을 누르면 송도, 거리 0.0
+    assert station_at(client, {"lon": 126.654663, "lat": 37.382084})["name"] == "송도"
+    assert station_at(client, {"lon": 126.654663, "lat": 37.382084})["distance_km"] == 0.0
 
 
 def test_point_every_cell_center_has_value(client, db):
