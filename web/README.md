@@ -76,3 +76,12 @@ node --check web/render.mjs
 - 사진은 photo_url의 /cam/ JPG만 사용. API 별도 주소 및 mock 경로 변환, 쿼리 보존.
 - ROI는 위쪽 60% CSS 테두리, 좌상단 라벨. 이미지 오류/추정 결측은 문구로 표시합니다.
 - 실제 서버 station 연결을 확인할 수 있으며 camera는 백엔드 S3 반영 후 확인합니다.
+
+## S5 직접 해보기
+
+- S4 예시: `?mode=mock&sample=1`. 사진 아래 버튼 클릭 후 약 10초 대기.
+- `&scenario=infer_rain` / `infer_busy` / `infer_error` / `infer_cached`: 결측·409·실패·캐시 결과.
+- 실제 모드는 POST /api/infer?camera_id= 를 1회 호출, 최대 30초 대기. 자동 재시도 없음.
+- 5초/8초 대기 단계는 실제 진행률이 아닌 안내. 버튼 중복 클릭 방지.
+- 실패해도 정기 회차 사진·값 유지. 즉석 결과는 별도 영역이며 지도 프레임을 변경하지 않음.
+- 패널 닫기/다른 위치 선택 시 요청·타이머 정리. 처리 중 1분 폴링은 패널을 덮어쓰지 않음.
