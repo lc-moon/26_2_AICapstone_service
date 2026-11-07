@@ -1,3 +1,4 @@
+import {mountInference} from './infer.mjs';
 import {renderEvidence} from './evidence.mjs';
 import {GRADES,gradeOf,rgb,validValue,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
 import {cloudImage,veilImage} from './render.mjs';
@@ -6,6 +7,7 @@ const mock=params.get('mode')==='mock', scenario=params.get('scenario')||'day';
 // API base is explicit; production defaults to same-origin and never silently uses mocks.
 const base=(params.get('api')||'').replace(/\/$/,'');
 let grid,layout,map,current,bounds,selection=null,pointRequest=0,busy=false,timer,toastTimer;
+let disposeInference=()=>{},inferenceBusy=false;
 let loadIssue='',healthIssue='',mapIssue='',health=null;
 const empty={type:'FeatureCollection',features:[]};
 const motion=1000;
@@ -42,12 +44,15 @@ async function refresh(){
   }else{loadIssue='데이터 갱신 실패 · 마지막 정상값을 표시합니다. 새로고침으로 다시 시도하세요.';if(!current)$('time').textContent='데이터 연결 실패';}
   if(h.status==='fulfilled'&&h.value&&typeof h.value.stale==='boolean'){health=h.value;healthIssue='';}
   else{health=null;healthIssue='갱신 상태 확인 불가 · 상태 API 연결을 기다리고 있습니다.';}
-  if(changed&&selection)void selectPoint(selection,false);
+  if(changed&&selection&&!inferenceBusy)void selectPoint(selection,false);
  }catch(error){loadIssue=`데이터를 확인할 수 없습니다: ${error.message}`;}
  finally{busy=false;showStatus();}
 }
 function text(tag,content,cls){const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el;}
-function displayPoint(data){renderEvidence($('details'),data,{mock,base});}
+function displayPoint(data){
+ renderEvidence($('details'),data,{mock,base});
+ if(data.camera)disposeInference=mountInference($('details').querySelector('.evidence-camera'),data.camera,{mock,base,scenario},value=>{inferenceBusy=value;});
+}
 async function getPoint(p){
  if(!mock)return json(`${base}/api/point?${new URLSearchParams({lon:p[0],lat:p[1]})}`,{allow404:true});
  const idx=cellAt(p,grid.cells,layout),cell=grid.cells[idx];
@@ -57,7 +62,7 @@ async function getPoint(p){
 }
 async function selectPoint(p,fly=true){
  if(!inside(p,grid.boundary)){notify('인천 내륙과 송도 안의 위치를 선택해 주세요.');return;}
- selection=p;const request=++pointRequest;$('panel').hidden=false;$('hint').hidden=true;
+ disposeInference();selection=p;const request=++pointRequest;$('panel').hidden=false;$('hint').hidden=true;
  $('details').replaceChildren(text('div','선택한 위치','place'),text('p','농도와 측정소 정보를 확인하고 있습니다…'));
  map.getSource('pick').setData({type:'Feature',properties:{},geometry:{type:'Point',coordinates:p}});
  document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');if(fly)map.flyTo({center:p,zoom:15.4,pitch:60,duration:motion,essential:true,padding:panelPad(true)});
@@ -66,7 +71,7 @@ async function selectPoint(p,fly=true){
   if(!data.inside){$('details').replaceChildren(text('p','서비스 범위 밖입니다.'));return;}displayPoint(data);if(fly)settle();
  }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도에서 다시 선택해 주세요.'));}
 }
-function closePanel(){selection=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;map?.getSource('pick')?.setData(empty);}
+function closePanel(){disposeInference();selection=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;map?.getSource('pick')?.setData(empty);}
 function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0}});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(estimate){const p=$('panel');return matchMedia('(max-width:700px)').matches?{top:$('legend').getBoundingClientRect().bottom,left:0,right:0,bottom:(estimate?Math.max(p.offsetHeight,innerHeight*.42):p.offsetHeight)+parseFloat(getComputedStyle(p).bottom)}:{top:0,bottom:0,left:0,right:0};}function settle(){const go=()=>{if(selection)map.easeTo({padding:panelPad(false),duration:300,essential:true});};map.isMoving()?map.once('moveend',go):go();}function closeAndCenter(){const p=selection;closePanel();if(p)map.easeTo({center:p,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});}function home(){closePanel();const mobile=matchMedia('(max-width:700px)').matches,center=mobile?[126.703, 37.474]:[126.69, 37.475];map.easeTo({center,zoom:mobile?10.45+Math.log2(innerWidth/393):fitZoom(center,{top:16,bottom:40,left:16,right:70}),pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});$('view').textContent='2D';$('view').setAttribute('aria-pressed','false');}
 function wire(){
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
@@ -104,4 +109,4 @@ async function start(){
   await refresh();timer=setInterval(()=>void refresh(),60000);
  }catch(e){loadIssue=`화면을 불러올 수 없습니다. ${e.message}`;showStatus();$('retry').onclick=()=>location.reload();}
 }
-addEventListener('pagehide',()=>{clearInterval(timer);clearTimeout(toastTimer);});void start();
+addEventListener('pagehide',()=>{disposeInference();clearInterval(timer);clearTimeout(toastTimer);});void start();
