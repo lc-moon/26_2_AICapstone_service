@@ -1,0 +1,13 @@
+{
+ "query": "강화도",
+ "status": "outside_area",
+ "results": [
+  {
+   "name": "강화군청",
+   "address": "인천 강화군 강화읍 관청리 360",
+   "lon": 126.4878,
+   "lat": 37.7466,
+   "inside": false
+  }
+ ]
+}

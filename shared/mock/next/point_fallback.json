@@ -1,0 +1,49 @@
+{
+ "inside": true,
+ "gu": "연수구",
+ "grid_id": 52,
+ "estimate": {
+  "pm25": 13.2,
+  "grade": "좋음",
+  "slot": "2026-10-16T13:20:00+09:00",
+  "source": "cctv",
+  "nearest_cctv_km": 2.4
+ },
+ "station": {
+  "name": "송도",
+  "distance_km": 1.8,
+  "pm25": 9,
+  "data_time": "2026-10-16T13:00:00+09:00",
+  "period": "12~13시 평균",
+  "lon": 126.654663,
+  "lat": 37.382084,
+  "nearest": {
+   "name": "아암",
+   "distance_km": 1.4,
+   "reason": "통신장애",
+   "lon": 126.63227,
+   "lat": 37.40508
+  }
+ },
+ "camera": {
+  "camera_id": "10042",
+  "name": "송도-스마트밸리#2",
+  "distance_km": 2.9,
+  "slot": "2026-10-16T13:20:00+09:00",
+  "captured_at": "2026-10-16T13:21:26+09:00",
+  "pm25": 8.7,
+  "status": "정상",
+  "photo_url": "/cam/10042.jpg?v=20261016132126",
+  "lon": 126.648114,
+  "lat": 37.368383,
+  "nearest": {
+   "camera_id": "113",
+   "name": "송도1교사거리",
+   "distance_km": 2.4,
+   "reason": "no_feed",
+   "since": "2026-10-16T12:40:00+09:00",
+   "lon": 126.666945,
+   "lat": 37.392985
+  }
+ }
+}
