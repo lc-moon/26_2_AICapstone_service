@@ -19,3 +19,4 @@
 .tools .seg{display:flex;flex-direction:column}.tools .seg button{height:24px;font-size:11px;font-weight:600;color:#7a8a89}.tools .seg button[aria-pressed=true]{background:#20353a;color:#fff}.tools .seg button[aria-pressed=true]:hover{background:#20353a}.tools>.seg,.tools .seg+button{border-top:1px solid #ddd}
 /* F21·F27 추정값 아래 한 줄 */
 .advice{font-size:12px;color:#36514f;margin-top:8px}.error-note{font-size:11px}.error-note a{color:inherit}
+.search-results{padding:0;margin:8px 0 0;list-style:none;max-height:200px;overflow:auto}.search-results:empty{display:none}.search-results button{width:100%;text-align:left;border:0;border-top:1px solid #dce5e1;background:white;padding:10px 4px;color:#234e48}.search-results strong,.search-results span{display:block;line-height:1.5}.search-results span{font-size:11px;color:#647773}.search-results button:hover{background:#eef5f1}

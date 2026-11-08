@@ -1,21 +1,7 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {createSearch,searchURL} from './search.mjs';
-const endpoint='https://nominatim.openstreetmap.org/search';
-const response=rows=>({ok:true,json:async()=>rows});
-test('search limits results to Korea and Incheon viewbox',()=>{
- const u=new URL(searchURL('인천시청',endpoint));assert.equal(u.searchParams.get('q'),'인천시청');assert.equal(u.searchParams.get('bounded'),'1');assert.equal(u.searchParams.get('countrycodes'),'kr');assert.equal(u.searchParams.get('limit'),'1');assert.equal(u.searchParams.get('viewbox'),'126.35,37.65,126.85,37.35');
-});
-test('cache including empty results avoids repeat requests; new query is throttled',async()=>{
- let calls=0,time=5000;const search=createSearch({endpoint,storage:null,now:()=>time,fetcher:async()=>{calls++;return response([]);}});
- assert.equal(await search('없는 이름'),null);assert.equal(await search(' 없는  이름 '),null);assert.equal(calls,1);
- await assert.rejects(search('인천시청'),/1초/);time+=1100;await search('인천시청');assert.equal(calls,2);
-});
-test('coordinates parsed and malformed responses rejected',async()=>{
- const search=createSearch({endpoint,storage:null,fetcher:async()=>response([{lon:'126.7',lat:'37.4',display_name:'송도'}])});assert.deepEqual((await search('송도')).point,[126.7,37.4]);
- const bad=createSearch({endpoint,storage:null,fetcher:async()=>response([{lon:'oops',lat:'37.4'}])});await assert.rejects(bad('a'),/위치/);
-});
-test('failed search does not cache an empty result',async()=>{
- let time=5000,calls=0;const search=createSearch({endpoint,storage:null,now:()=>time,fetcher:async()=>{calls++;if(calls===1)throw Error('offline');return response([]);}});
- await assert.rejects(search('부평역'),/offline/);time+=1100;assert.equal(await search('부평역'),null);assert.equal(calls,2);
-});
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import {createSearch,validateSearch,SEARCH_MESSAGES} from './search.mjs';
+const fixture=name=>JSON.parse(fs.readFileSync(new URL(`../shared/mock/next/${name}.json`,import.meta.url)));
+test('all supplied search outcomes accepted',()=>{for(const n of ['search_ok','search_address_ok','search_empty','search_outside_area','search_outside_incheon'])assert.ok(validateSearch(fixture(n)));});
+test('same query always calls backend without result cache',async()=>{let calls=[];const search=createSearch({base:'https://example.test',fetcher:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>fixture('search_address_ok')};}});await search('용현동 88-16');await search('용현동 88-16');assert.equal(calls.length,2);assert.equal(new URL(calls[0].url).pathname,'/api/search');assert.equal(new URL(calls[0].url).searchParams.get('q'),'용현동 88-16');assert.equal(calls[0].options.cache,'no-store');});
+test('503 fails; unknown status and invalid coordinates fail',async()=>{await assert.rejects(createSearch({fetcher:async()=>({ok:false,status:503})})('a'));assert.throws(()=>validateSearch({status:'bad',results:[]}));const data=fixture('search_ok');data.results[0].lon=null;assert.throws(()=>validateSearch(data));assert.match(SEARCH_MESSAGES.error,/지도를 직접/);});
+test('result list is at most five and address selects single result',()=>{const d=fixture('search_ok');d.results=Array(8).fill(d.results[0]);assert.equal(validateSearch(d).results.length,5);assert.equal(validateSearch(fixture('search_address_ok')).results.length,1);});

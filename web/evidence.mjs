@@ -35,7 +35,7 @@ export function cameraFigure(camera, options) {
 }
 
 export function renderEvidence(host,data,options={}) {
-  host.replaceChildren(element('h2',`${data.gu || '선택한 위치'} 부근`,'place'));
+  host.replaceChildren(element('h2',options.placeName?`${options.placeName} · ${data.gu||'선택한 위치'}`:`${data.gu || '선택한 위치'} 부근`,'place'));
   const columns = element('div',null,'evidence-columns');
   const estimate = element('section',null,'evidence-section');
   estimate.append(element('h3','선택한 곳의 추정 농도'));
