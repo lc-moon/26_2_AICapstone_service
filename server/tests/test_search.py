@@ -144,10 +144,10 @@ def test_kakao_failure_503_without_query_in_log(client, monkeypatch, caplog, han
     assert "비밀검색어" not in caplog.text and "%EB%B9%84" not in caplog.text and "test-key" not in caplog.text
 
 
-def test_timeout_is_five_seconds():
+def test_client_times_out_in_five_seconds_and_is_reused():
     import app
-    with app.kakao_client() as c:
-        assert c.timeout.read == 5
+    assert app.kakao_client().timeout.read == 5
+    assert app.kakao_client() is app.kakao_client()   # 검색마다 새로 연결하지 않는다
 
 
 @pytest.mark.parametrize("q, status", [("", 422), ("   ", 422), ("a" * 101, 422), ("a" * 100, 200)])

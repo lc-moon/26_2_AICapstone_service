@@ -444,8 +444,10 @@ def nearest_station(conn, lon, lat):
             "data_time": iso(t), "period": period(t) if t else None, "lon": x, "lat": y, "nearest": nearest}
 
 
+@lru_cache(maxsize=1)
 def kakao_client():
-    return httpx.Client(timeout=5)   # 테스트에서 바꿔 끼운다
+    # 연결을 재사용한다. 검색마다 새로 열면 호출 수와 상관없이 약 0.4~1.2초가 들었다(11/9 측정). 테스트에서 바꿔 끼운다
+    return httpx.Client(timeout=5, limits=httpx.Limits(keepalive_expiry=30))
 
 
 def kakao_docs(client, key, kind, **params):
@@ -461,15 +463,15 @@ def kakao_search(key, q):
     범위 안 결과는 검색어가 이름에 든 것만 쓴다(카카오는 "서울역"에 범위 안의 "서울보청기 만수역점"을 돌려준다).
     없으면 전국을 찾아 "인천 밖"·"범위 밖"을 구분한다"""
     compact = lambda s: "".join(s.split()).lower()
-    with kakao_client() as c:
-        docs = kakao_docs(c, key, "address", query=q)
-        if docs:
-            return [(d["address_name"], (d.get("road_address") or {}).get("address_name") or d["address_name"],
-                     d["x"], d["y"]) for d in docs]
-        docs = ([d for d in kakao_docs(c, key, "keyword", query=q, size=15, rect=area_rect())
-                 if compact(q) in compact(d["place_name"])]
-                or kakao_docs(c, key, "keyword", query=q, size=5))
-        return [(d["place_name"], d.get("road_address_name") or d["address_name"], d["x"], d["y"]) for d in docs]
+    c = kakao_client()
+    docs = kakao_docs(c, key, "address", query=q)
+    if docs:
+        return [(d["address_name"], (d.get("road_address") or {}).get("address_name") or d["address_name"],
+                 d["x"], d["y"]) for d in docs]
+    docs = ([d for d in kakao_docs(c, key, "keyword", query=q, size=15, rect=area_rect())
+             if compact(q) in compact(d["place_name"])]
+            or kakao_docs(c, key, "keyword", query=q, size=5))
+    return [(d["place_name"], d.get("road_address_name") or d["address_name"], d["x"], d["y"]) for d in docs]
 
 
 @app.get("/api/search")
