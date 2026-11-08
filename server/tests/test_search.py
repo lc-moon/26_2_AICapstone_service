@@ -41,8 +41,37 @@ def test_place_name_ok(kakao):
     assert r.status_code == 200 and r.json() == mock("next/search_ok.json")
     addr, key = kakao.seen                                   # 주소 검색 먼저, 없어서 키워드 검색
     assert addr.url.path == "/v2/local/search/address.json" and addr.url.params["query"] == "인하대학교"
-    assert key.url.path == "/v2/local/search/keyword.json" and key.url.params["size"] == "5"
+    assert key.url.path == "/v2/local/search/keyword.json" and key.url.params["size"] == "15"
+    assert len(key.url.params["rect"].split(",")) == 4       # 서비스 범위 안부터
     assert addr.headers["authorization"] == "KakaoAK test-key"
+
+
+def keyword_by_area(client, monkeypatch, in_area, nationwide):
+    """서비스 범위 검색(rect 있음)과 전국 검색에 다른 결과를 준다"""
+    monkeypatch.setenv("KAKAO_REST_KEY", "test-key")
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path.endswith("address.json"):
+            return httpx.Response(200, json={"documents": []})
+        return httpx.Response(200, json={"documents": list(in_area if "rect" in request.url.params else nationwide)})
+    respond(monkeypatch, handler)
+    return seen
+
+
+def test_common_name_found_in_area_first(client, monkeypatch):
+    # 전국 상위 5개가 모두 인천 밖이어도 범위 안 결과를 쓴다
+    seen = keyword_by_area(client, monkeypatch, [INHA], [SEOUL] * 5)
+    got = client.get("/api/search", params={"q": "홈플러스"}).json()
+    assert got["status"] == "ok" and got["results"][0]["name"] == "인하대학교" and len(seen) == 2   # 전국 검색은 안 함
+
+
+@pytest.mark.parametrize("q, doc, status", [("서울역", SEOUL, "outside_incheon"), ("강화도", GANGHWA, "outside_area")])
+def test_nationwide_only_when_area_has_nothing(client, monkeypatch, q, doc, status):
+    seen = keyword_by_area(client, monkeypatch, [], [doc])
+    assert client.get("/api/search", params={"q": q}).json()["status"] == status
+    assert len(seen) == 3 and seen[2].url.params["size"] == "5" and "rect" not in seen[2].url.params
 
 
 def test_lot_number_uses_address_search(kakao):

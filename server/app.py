@@ -240,6 +240,15 @@ def boundary():
     return next(f["geometry"] for f in feats if f["properties"]["kind"] == "area")
 
 
+@lru_cache
+def area_rect():
+    """서비스 범위를 감싸는 사각형. 카카오 키워드 검색의 rect 값(왼쪽 경도,아래 위도,오른쪽 경도,위 위도)"""
+    g = boundary()
+    polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+    xs, ys = zip(*(p[:2] for poly in polys for p in poly[0]))
+    return f"{min(xs)},{min(ys)},{max(xs)},{max(ys)}"
+
+
 def in_ring(x, y, ring):
     inside, j = False, len(ring) - 1
     for i in range(len(ring)):
@@ -444,14 +453,17 @@ def kakao_docs(client, key, kind, **params):
 
 
 def kakao_search(key, q):
-    """주소 검색(지번·도로명), 결과가 없으면 키워드 검색(장소 이름). [(이름, 주소, x, y)]"""
+    """주소 검색(지번·도로명), 결과가 없으면 키워드 검색(장소 이름). [(이름, 주소, x, y)]
+    키워드는 서비스 범위 안을 먼저 찾는다. 전국에서 5개만 받으면 "홈플러스"처럼 흔한 이름이 전부 인천 밖으로 나온다.
+    범위 안에 없을 때만 전국을 찾아 "인천 밖"·"범위 밖"을 구분한다"""
     with kakao_client() as c:
         docs = kakao_docs(c, key, "address", query=q)
         if docs:
             return [(d["address_name"], (d.get("road_address") or {}).get("address_name") or d["address_name"],
                      d["x"], d["y"]) for d in docs]
-        return [(d["place_name"], d.get("road_address_name") or d["address_name"], d["x"], d["y"])
-                for d in kakao_docs(c, key, "keyword", query=q, size=5)]
+        docs = (kakao_docs(c, key, "keyword", query=q, size=15, rect=area_rect())
+                or kakao_docs(c, key, "keyword", query=q, size=5))
+        return [(d["place_name"], d.get("road_address_name") or d["address_name"], d["x"], d["y"]) for d in docs]
 
 
 @app.get("/api/search")
