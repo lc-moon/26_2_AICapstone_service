@@ -96,6 +96,8 @@ def test_timeout_503(infer, monkeypatch):
     ('{"camera_id": "10042", "captured_at": "x", "pm25": "12"}', 503),  # 숫자 아님
     ('{"camera_id": "10042", "captured_at": "x", "pm25": -1}', 503),
     ('[1, 2]', 503),
+    ('{"camera_id": "10042", "captured_at": null, "pm25": null, "status": "night"}', 200),   # F10 밤: 촬영 시각 없이 사유만
+    ('{"camera_id": "10042", "captured_at": null, "pm25": 3}', 503),                               # 값이 있는데 촬영 시각 없음
 ])
 def test_output_checked(infer, client, monkeypatch, line, status):
     import shlex
@@ -118,3 +120,15 @@ def test_other_api_responds_during_infer(infer, client):
         assert client.get("/api/frames/latest").status_code == 404   # 프레임 없음 — 막히지 않고 바로 답함
         assert time.monotonic() - t < 1 and not done.is_set()
         assert f.result().status_code == 200
+
+
+def test_night_answer_keeps_reason(infer, client, monkeypatch):
+    """F10: 추정기는 밤이면 사진을 안 찍고 captured_at·pm25 없이 사유만 낸다 → 503이 아니라 200 + 사유"""
+    import shlex
+    py = Path(sys.executable).as_posix()
+    line = '{"camera_id": "10042", "requested_at": "2026-11-08T18:30:00+09:00", "captured_at": None, "pm25": None, "status": "밤 — 추정 안 함", "photo_url": None}'
+    monkeypatch.setenv("INFER_CMD", f'"{py}" -c {shlex.quote(f"import json; print(json.dumps({line}))")}')
+    r = client.post("/api/infer", params={"camera_id": "10042"})
+    assert r.status_code == 200
+    got = r.json()
+    assert (got["captured_at"], got["pm25"], got["grade"], got["status"]) == (None, None, None, "밤 — 추정 안 함")
