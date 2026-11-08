@@ -325,37 +325,68 @@ def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90)
         return {"inside": False}
     with connect() as conn:
         grid_id, gu, _, _ = cell_at(conn, lon, lat)
-        f = conn.execute("SELECT slot, source, values[%s] FROM frames" + ONLY + LATEST,
+        f = conn.execute("SELECT slot, source, values[%s], inputs FROM frames" + ONLY + LATEST,
                          (grid_id + 1, source, source)).fetchone()   # PostgreSQL 배열은 1부터
         cams = conn.execute("SELECT lon, lat FROM cameras").fetchall()
         station = nearest_station(conn, lon, lat)
-        camera = nearest_camera(conn, lon, lat)
+        camera = nearest_camera(conn, lon, lat, f)
     estimate = None
     if f:
-        slot, source, v = f
+        slot, source, v, _ = f
         v = None if v is None or math.isnan(v) else round(v, 1)
         estimate = {"pm25": v, "grade": grade(v), "slot": iso(slot), "source": source,
                     "nearest_cctv_km": round(min(math.hypot((lon - x) * KX, (lat - y) * KY) for x, y in cams), 1)}
     return {"inside": True, "gu": gu, "grid_id": grid_id, "estimate": estimate, "station": station, "camera": camera}
 
 
-def nearest_camera(conn, lon, lat):
-    """가장 가까운 화면 범위 카메라(grid_id 있음 — 103번 제외)의 가장 최근 estimates 한 줄(NEXT.md S3).
-    사진 파일은 추정기가 /cam/{camera_id}.jpg로 덮어쓴다. 그 카메라 행이 없으면 None"""
-    cams = conn.execute("SELECT camera_id, name, lon, lat FROM cameras WHERE grid_id IS NOT NULL").fetchall()
+def skipped_camera(conn, cam, slot):
+    """지도에 값을 못 낸 가장 가까운 카메라와 그 이유(코드만, 문구는 화면이 만듦)"""
+    d, cid, name, x, y = cam
+    row = conn.execute("SELECT status FROM estimates WHERE camera_id = %s AND slot = %s", (cid, slot)).fetchone()
+    if not row:
+        reason = "no_feed"   # 같은 회차에 다른 카메라 사진은 왔으니 영상 제공 쪽 문제로 본다(팀장 결정)
+    else:
+        st = row[0]
+        reason = ("rain" if st.startswith("비") else "humidity" if st.startswith("습도 95% 이상")
+                  else "weather_missing" if st.startswith("습도 결측") else "photo_error")
+    day = slot.astimezone(KST).replace(hour=0, minute=0, second=0, microsecond=0)
+    last = conn.execute("SELECT max(slot) FROM estimates WHERE camera_id = %s AND pm25_est IS NOT NULL"
+                        " AND slot >= %s AND slot < %s", (cid, day, slot)).fetchone()[0]
+    return {"camera_id": cid, "name": name, "distance_km": round(d, 1), "reason": reason,
+            "since": iso(last + timedelta(minutes=20)) if last else None, "lon": x, "lat": y}
+
+
+def nearest_camera(conn, lon, lat, frame):
+    """근거 사진 카메라(NEXT.md F14, 103번 제외). frame = /api/point가 고른 지도(slot, source, 값, inputs).
+    CCTV 지도면 그 지도에 값을 낸 카메라 중 가장 가까운 곳의 그 회차 행, 가장 가까운 곳이 빠졌으면 nearest에 이유.
+    측정소 지도(또는 지도 없음)면 가장 가까운 카메라의 가장 최근 행. 행이 없으면 None"""
+    cams = sorted((math.hypot((lon - x) * KX, (lat - y) * KY), c, n, x, y) for c, n, x, y in conn.execute(
+        "SELECT camera_id, name, lon, lat FROM cameras WHERE grid_id IS NOT NULL").fetchall())
     if not cams:
         return None
-    d, cid, name = min((math.hypot((lon - x) * KX, (lat - y) * KY), c, n) for c, n, x, y in cams)
-    row = conn.execute("SELECT slot, captured_at, pm25_est, status FROM estimates WHERE camera_id = %s"
-                       " ORDER BY slot DESC LIMIT 1", (cid,)).fetchone()
+    nearest = None
+    if frame and frame[1] == "cctv":
+        slot, _, _, inputs = frame
+        pick = next((c for c in cams if c[1] in inputs), None)
+        if pick is None:
+            return None
+        row = conn.execute("SELECT slot, captured_at, pm25_est, status FROM estimates WHERE camera_id = %s AND slot = %s",
+                           (pick[1], slot)).fetchone()
+        if pick is not cams[0]:
+            nearest = skipped_camera(conn, cams[0], slot)
+    else:
+        pick = cams[0]
+        row = conn.execute("SELECT slot, captured_at, pm25_est, status FROM estimates WHERE camera_id = %s"
+                           " ORDER BY slot DESC LIMIT 1", (pick[1],)).fetchone()
     if not row:
         return None
+    d, cid, name, x, y = pick
     slot, captured, pm, status = row
     # ?v= 는 브라우저 캐시 깨기용(한국 시각 숫자). captured_at이 비어 있으면 회차 시각으로
     v = (captured or slot).astimezone(KST).strftime("%Y%m%d%H%M%S")
     return {"camera_id": cid, "name": name, "distance_km": round(d, 1), "slot": iso(slot),
             "captured_at": iso(captured), "pm25": None if pm is None else round(pm, 1), "status": status,
-            "photo_url": f"/cam/{cid}.jpg?v={v}"}
+            "photo_url": f"/cam/{cid}.jpg?v={v}", "lon": x, "lat": y, "nearest": nearest}
 
 
 def period(t):
@@ -365,17 +396,26 @@ def period(t):
 
 
 def nearest_station(conn, lon, lat):
-    """가장 가까운 비교용 측정소의 가장 최근 실측 한 줄(NEXT.md S1).
-    그 줄이 결측(null)이면 pm25 null — 더 이전 시각이나 다른 측정소로 메우지 않는다"""
-    rows = conn.execute("SELECT station_name, lon, lat FROM stations WHERE use_for_compare").fetchall()
+    """비교용 측정소 실측(NEXT.md F14). 기준 시각 = 비교용 측정소에 값이 있는 가장 최근 data_time,
+    그 시각에 값이 있는 곳 중 가장 가까운 곳. 다른 시각 값으로 메우지 않고 장소만 바꾸며, 건너뛴 곳은 nearest에"""
+    rows = sorted((math.hypot((lon - x) * KX, (lat - y) * KY), n, x, y) for n, x, y in conn.execute(
+        "SELECT station_name, lon, lat FROM stations WHERE use_for_compare").fetchall())
     if not rows:
         return None
-    d, name = min((math.hypot((lon - x) * KX, (lat - y) * KY), n) for n, x, y in rows)
-    t, pm = conn.execute("SELECT data_time, pm25 FROM observations WHERE station_name = %s"
-                         " ORDER BY data_time DESC LIMIT 1", (name,)).fetchone() or (None, None)
-    return {"name": name, "distance_km": round(d, 1),
-            "pm25": None if pm is None or math.isnan(pm) else round(pm, 1),
-            "data_time": iso(t), "period": period(t) if t else None}
+    t = conn.execute("SELECT max(o.data_time) FROM observations o JOIN stations s USING (station_name)"
+                     " WHERE s.use_for_compare AND o.pm25 IS NOT NULL").fetchone()[0]
+    at = {n: (pm, flag) for n, pm, flag in conn.execute(
+        "SELECT station_name, pm25, pm25_flag FROM observations WHERE data_time = %s", (t,)).fetchall()} if t else {}
+    pick = next((r for r in rows if at.get(r[1], (None,))[0] is not None), rows[0])   # 값이 하나도 없으면 가장 가까운 곳
+    d, name, x, y = pick
+    pm = at.get(name, (None,))[0]
+    nearest = None
+    if pick is not rows[0]:
+        d0, n0, x0, y0 = rows[0]
+        nearest = {"name": n0, "distance_km": round(d0, 1), "reason": at.get(n0, (None, None))[1] or None,
+                   "lon": x0, "lat": y0}
+    return {"name": name, "distance_km": round(d, 1), "pm25": None if pm is None else round(pm, 1),
+            "data_time": iso(t), "period": period(t) if t else None, "lon": x, "lat": y, "nearest": nearest}
 
 
 @app.get("/api/health")
