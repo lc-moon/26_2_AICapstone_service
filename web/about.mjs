@@ -1,4 +1,6 @@
 // Copy remains plain HTML so the author can edit it without JavaScript.
+import {applyTheme} from './theme.mjs';
+applyTheme();
 const backParams=new URLSearchParams(location.search);backParams.set('restore','1');
 document.getElementById('back-map').href=`index.html?${backParams}`;
 const image=document.getElementById('comparison-image');

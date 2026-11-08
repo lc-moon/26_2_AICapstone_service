@@ -150,5 +150,7 @@ sudo systemctl restart incheon-air-api                                 # server/
 ```
 
 - 확인: `curl -s localhost:8001/api/health`, `systemctl status incheon-air-api caddy`
+
+**비교용 새 화면 `/new/` (11/9 리디자인)**: 기존 `/web/`을 그대로 두고 `/srv/incheon-air-new`(`feat/redesign-resend` git worktree)의 `web/`만 Caddy로 내준다. API는 공용이라 프로세스가 늘지 않는다. 고른 뒤에는 `main`에 머지해 `/web/`으로 합치고 worktree와 Caddy의 `/new/` 설정을 지운다. 새 화면은 `/shared/cameras.json`도 읽는다.
 - 수집기와 메모리를 나눠 써서 서버에 무거운 라이브러리를 넣지 않습니다. 수집기가 우선입니다(메모리가 모자라면 API가 먼저 정리됨)
 

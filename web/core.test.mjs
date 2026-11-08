@@ -16,3 +16,4 @@ test('F27 advice follows grade boundaries and stays empty for missing values',as
  assert.match(adviceFor(15),/제약 없음/);assert.equal(adviceFor(null),'');
  assert.match(adviceFor(16),/민감군/);assert.match(adviceFor(36),/KF80/);assert.match(adviceFor(76),/KF94/);
 });
+test('gauge gives each grade a quarter of the bar',async()=>{const {gaugePos}=await import('./core.mjs');for(const [v,p] of [[0,0],[15,25],[16,26.25],[35,50],[36,50.625],[75,75],[150,100],[400,100]])assert.ok(Math.abs(gaugePos(v)-p)<1e-9,String(v));assert.ok(Math.abs(gaugePos(76)-75.333)<.01);assert.equal(gaugePos(15.4),25);});
