@@ -1,4 +1,4 @@
-import {formatTime,gradeOf,validValue,rgb} from './core.mjs';
+import {formatTime,gradeOf,validValue,rgb,adviceFor} from './core.mjs';
 
 export function element(tag, content, className) {
   const node = document.createElement(tag);
@@ -43,12 +43,19 @@ export function renderEvidence(host,data,options={}) {
   estimate.append(element('div',concentration(e?.pm25),'value'));
   if(validValue(e?.pm25)) {
     const g=gradeOf(e.pm25),badge=element('span',g.name,'badge');badge.style.background=rgb(g.light);estimate.append(badge);
+    const advice=adviceFor(e.pm25);if(advice){const a=element('p',`행동 요령(참고): ${advice}`,'advice');a.title='민감군: 어린이·노인·호흡기·심혈관 질환자·임산부. 마스크를 쓰고 숨쉬기 불편하면 벗고 쉬세요. 하루 평균 예보 기준 문구입니다';estimate.append(a);}   // F27
   }
   estimate.append(element('p',e?.source==='station'?'측정소 실측 기반 보간':'CCTV 추정값 기반 공간 보간'),element('p',`${formatTime(e?.slot)} 기준`));
+  if(e?.source==='cctv'){   // F21: 지도 값은 여러 사진을 보간한 것이라 같은 오차가 아니다 — "사진 한 장 기준"을 꼭 붙인다
+    const note=element('p','사진 한 장 기준 평균 오차 2.9㎍/㎥ (처음 보는 13일) · ','error-note'),link=element('a','원리 보기');
+    link.href=`about.html${typeof location==='undefined'?'':location.search}#section-5`;note.append(link);estimate.append(note);
+  }
   const observation = element('section',null,'evidence-section');
   observation.append(element('h3','가까운 측정소 실측'));
   const s=data.station;
-  if(s) observation.append(element('h4',s.name),element('div',concentration(s.pm25),'value'),element('p',`${formatTime(s.data_time)} 기준`),element('p',s.period || '평균 시간 정보 없음'),element('p',Number.isFinite(s.distance_km)?`선택한 곳에서 ${s.distance_km.toFixed(1)}km`:''));
+  if(s) observation.append(element('h4',s.name),element('div',concentration(s.pm25),'value'));
+  if(s&&validValue(s.pm25)){const g=gradeOf(s.pm25),badge=element('span',g.name,'badge');badge.style.background=rgb(g.light);observation.append(badge);}   // F4
+  if(s) observation.append(element('p',`${formatTime(s.data_time)} 기준`),element('p',s.period || '평균 시간 정보 없음'),element('p',Number.isFinite(s.distance_km)?`선택한 곳에서 ${s.distance_km.toFixed(1)}km`:''));
   else observation.append(element('p','측정소 실측값을 아직 제공하지 않습니다.'));
   columns.append(estimate,observation);
   if(data.camera) {

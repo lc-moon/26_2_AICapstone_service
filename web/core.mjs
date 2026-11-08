@@ -53,3 +53,14 @@ export function formatTime(t) {
   if(!t||!Number.isFinite(Date.parse(t)))return '기준 시각 없음';
   return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
 }
+
+// F27 등급별 행동 요령 한 줄(실외 활동 + 마스크). 근거: 환경부 예보 등급별 행동요령(지자체 게시본: 나쁨 "장시간 또는 무리한 실외활동 제한",
+// 매우나쁨 민감군 "가급적 실내활동"), 식약처 보건용 마스크 안내(KF80·94·99, 숫자가 클수록 잘 거르지만 숨쉬기 어려움 — 농도와 호흡에 맞춰 고름).
+// 하루 평균 예보 기준 문구라 화면에는 "참고"로 둔다. 민감군 = 어린이·노인·호흡기·심혈관 질환자·임산부
+export const ADVICE = {
+  '좋음': '실외 활동에 제약 없음',
+  '보통': '민감군만 몸 상태에 따라 유의',
+  '나쁨': '오래·무리한 실외 활동 줄이기 · 외출 시 KF80 이상 마스크',
+  '매우나쁨': '실외 활동 최소화, 민감군은 실내 · 외출 시 KF94 마스크',
+};
+export const adviceFor = v => validValue(v) ? ADVICE[gradeOf(v).name] || '' : '';

@@ -4,7 +4,8 @@ export function inferFailure(status) {
   return status===409?'다른 분이 추정 중이에요. 잠시 뒤 다시 눌러 주세요.':'지금은 할 수 없어요. 기존 회차 사진과 값은 그대로 확인할 수 있습니다.';
 }
 export function validateInference(data,cameraId) {
-  if(!data || String(data.camera_id)!==String(cameraId) || !(data.pm25===null||validValue(data.pm25)) || !Number.isFinite(Date.parse(data.captured_at))) throw Error('잘못된 추정 응답');
+  const night=data?.captured_at==null&&data?.pm25===null;   // F10: 밤에는 사진을 안 찍고 사유만 온다
+  if(!data || String(data.camera_id)!==String(cameraId) || !(data.pm25===null||validValue(data.pm25)) || !(night||Number.isFinite(Date.parse(data.captured_at)))) throw Error('잘못된 추정 응답');
   return data;
 }
 function wait(ms,signal) {
@@ -49,6 +50,7 @@ export function mountInference(host,camera,options,onBusy=()=>{}) {
       const data=await requestInference(camera.camera_id,{...options,signal:controller.signal});
       if(disposed)return;
       status.textContent='④ 결과 확인';
+      if(data.captured_at==null){result.append(element('h4','지금은 추정하지 않아요'),element('p',/밤/.test(data.status||'')?'밤에는 어두운 사진을 학습하지 않아 추정하지 않아요. 지도는 측정소 실측으로 채워져 있습니다.':(data.status||'추정 안 함'),'camera-result'));return;}
       result.append(element('h4',data.cached?'방금 누른 결과':'지금 촬영한 사진의 추정 결과'));
       if(options.mock)result.append(element('p','MOCK · 현재 촬영이 아닌 예시 결과입니다.'));
       result.append(cameraFigure({...camera,...data},options),element('p',validValue(data.pm25)?`${concentration(data.pm25)} · ${gradeOf(data.pm25).name}`:data.status||'추정 안 함','camera-result'),element('p',`${formatTime(data.captured_at)} 촬영${Number.isFinite(data.elapsed_s)?' · 처리 '+data.elapsed_s.toFixed(1)+'초':''}`),element('p','이 즉석 결과는 위 지도와 정기 회차 값을 바꾸지 않습니다.'));

@@ -39,7 +39,7 @@ export async function mountSearch(form,{inside,onSelect}){
   input.disabled=true;status.textContent='장소를 찾고 있습니다…';
   try{const result=await search(query);
    if(!result){status.textContent='결과가 없습니다. 정식 이름이나 주소로 검색해 주세요.';return;}
-   if(!inside(result.point)){status.textContent='인천 내륙·송도 서비스 범위 밖의 장소입니다.';return;}
+   if(!inside(result.point)){status.textContent='CCTV가 없는 곳(영종·강화·섬)은 추정하지 않아요. 인천 내륙과 송도를 검색해 주세요.';return;}
    status.textContent=result.name;onSelect(result.point);
   }catch(error){status.textContent=error.name==='AbortError'?'검색 응답이 늦습니다. 잠시 뒤 다시 시도해 주세요.':error.message;}
   finally{input.disabled=false;input.focus();}

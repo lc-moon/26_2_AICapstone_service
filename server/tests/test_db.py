@@ -378,3 +378,65 @@ def test_source_cctv_without_cctv_frame(client, db, monkeypatch):
     assert client.get("/api/frames/latest", params={"source": "cctv"}).status_code == 404
     assert client.get("/api/point", params={**SONGDO, "source": "cctv"}).json()["estimate"] is None
     assert client.get("/api/point", params=SONGDO).json()["estimate"]["source"] == "station"
+
+
+# ── F12: 유효 CCTV가 MIN_CCTV(10)대 미만이면 측정소 지도 ─────────────
+
+def test_few_cctv_values_use_station_frame(client, db):
+    import app
+    rows = mock("ingest_estimates.json")["rows"]   # 13:20 회차 19대
+    obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9))
+    few = [r if i < app.MIN_CCTV - 1 else {**r, "pm25_est": None, "status": "비"} for i, r in enumerate(rows)]
+    res = post(client, few)
+    assert res["frames"] == [{"slot": "2026-10-16T13:20:00+09:00", "n_inputs": app.MIN_CCTV - 1}]   # 응답은 CCTV 유효값 수 그대로
+    assert frame(db, "2026-10-16T13:20+09")[:2][0] == "station"
+    # 한 대가 더 오면 MIN_CCTV대 → CCTV 지도
+    post(client, [rows[app.MIN_CCTV - 1]])
+    assert frame(db, "2026-10-16T13:20+09")[:3] == ("cctv", None, app.MIN_CCTV)
+
+
+# ── F11: 최신 지도 = 자료 시각이 가장 늦은 것, 같으면 CCTV ─────────────
+
+def at_slot(rows, slot):
+    return [{**r, "slot": slot} for r in rows]
+
+
+def latest(client):
+    f = client.get("/api/frames/latest").json()
+    e = client.get("/api/point", params=SONGDO).json()["estimate"]
+    assert (e["slot"], e["source"]) == (f["slot"], f["source"])   # 지도와 지점 조회가 같은 지도를 고른다
+    return f["slot"], f["source"], f["basis_time"]
+
+
+def test_latest_empty_slot_with_newer_obs_wins(client, db):
+    rows = mock("ingest_estimates.json")["rows"]
+    post(client, at_slot(rows, "2026-10-16T12:40:00+09:00"))                     # CCTV 12:40
+    obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9))
+    post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])         # 13:20 빈 회차 → 13:00 실측
+    assert latest(client) == ("2026-10-16T13:20:00+09:00", "station", "2026-10-16T13:00:00+09:00")
+
+
+def test_latest_stale_obs_does_not_push_out_newer_cctv(client, db):
+    rows = mock("ingest_estimates.json")["rows"]
+    post(client, at_slot(rows, "2026-10-16T12:40:00+09:00"))                     # CCTV 12:40
+    obs(db, ("아암", "2026-10-15T13:00+09", 11), ("송도", "2026-10-15T13:00+09", 9))   # 에어코리아가 어제부터 멈춤
+    post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])         # 13:20 빈 회차 → 어제 실측으로 채워짐
+    assert frame(db, "2026-10-16T13:20+09")[0] == "station"
+    assert latest(client) == ("2026-10-16T12:40:00+09:00", "cctv", None)
+
+
+def test_latest_older_obs_than_cctv_loses(client, db):
+    rows = mock("ingest_estimates.json")["rows"]
+    post(client, rows)                                                            # CCTV 13:20
+    obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9))
+    post(client, [{**r, "pm25_est": None, "status": "비"} for r in at_slot(rows, "2026-10-16T14:00:00+09:00")])
+    assert frame(db, "2026-10-16T14:00+09")[0] == "station"                       # 14:00 빈 회차는 13:00 실측으로
+    assert latest(client) == ("2026-10-16T13:20:00+09:00", "cctv", None)
+
+
+def test_latest_tie_prefers_cctv(client, db):
+    rows = mock("ingest_estimates.json")["rows"]
+    post(client, at_slot(rows, "2026-10-16T13:00:00+09:00"))                     # CCTV 13:00
+    obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9))
+    post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])         # 13:20 빈 회차 → 자료 시각 13:00 (동점)
+    assert latest(client) == ("2026-10-16T13:00:00+09:00", "cctv", None)

@@ -26,6 +26,7 @@ from sun import is_day
 KST = timezone(timedelta(hours=9))
 log = logging.getLogger("uvicorn.error")
 METHOD = "idw 1/(d²+0.05)"
+MIN_CCTV = 10   # 유효 CCTV 값이 이보다 적으면 CCTV 지도를 만들지 않고 빈 회차처럼 측정소로(입력 1대면 IDW가 인천 전체를 한 값으로 칠함). 측정값이 아니라 출발점으로 정한 기준(11/8)
 STALE_AFTER = timedelta(minutes=40)   # 낮에 2회차(40분) 동안 추정값이 하나도 안 오면 stale
 GRADES = [(15, "좋음"), (35, "보통"), (75, "나쁨")]   # 반올림 후 판정, 그 위는 매우나쁨
 
@@ -101,8 +102,8 @@ def rebuild_frame(conn, slot):
            WHERE e.slot = %s AND e.pm25_est IS NOT NULL ORDER BY e.camera_id""",
         (slot,),
     ).fetchall()
-    if not inputs:
-        # 낮 빈 회차: CCTV 프레임을 지우고 그 회차 이전 가장 최근 실측으로 대신 만든다
+    if len(inputs) < MIN_CCTV:
+        # 낮 빈 회차(또는 유효 CCTV가 MIN_CCTV대 미만): CCTV 프레임을 지우고 그 회차 이전 가장 최근 실측으로 대신 만든다
         conn.execute("DELETE FROM frames WHERE slot = %s AND source = 'cctv'", (slot,))
         try:
             with conn.transaction():   # savepoint — 실패해도 추정값 수신은 그대로 성공
@@ -111,7 +112,7 @@ def rebuild_frame(conn, slot):
                     station_frame(conn, slot, basis)
         except Exception:
             log.exception("빈 회차 측정소 프레임 실패 %s", slot)
-        return 0
+        return len(inputs)   # 수신 응답의 n_inputs는 늘 CCTV 유효값 수
     centers = conn.execute("SELECT center_lon, center_lat FROM grid_cells ORDER BY grid_id").fetchall()
     values = idw(centers, [(lon, lat, pm) for _, lon, lat, pm, _ in inputs])
     models = sorted({m for *_, m in inputs if m})
@@ -263,14 +264,17 @@ def grid():
 # 전시용(S10): source=cctv면 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차). source가 없으면 가장 최근 프레임. 다른 값은 422
 Source = Annotated[Optional[Literal["cctv"]], Query()]
 ONLY = " WHERE (%s::text IS NULL OR source = %s)"
+# 최신 = 자료 시각이 가장 늦은 지도(측정소 지도는 basis_time, CCTV 지도는 회차 시각). 같으면 CCTV, 그다음 회차 시각(11/8 F11)
+# 회차 시각으로만 고르면, 에어코리아가 멈췄을 때 어제 실측으로 채운 빈 회차가 오늘 더 새로운 CCTV 지도를 밀어낸다
+LATEST = " ORDER BY COALESCE(basis_time, slot) DESC, (source = 'cctv') DESC, slot DESC LIMIT 1"
 
 
 @app.get("/api/frames/latest")
 def frames_latest(source: Source = None):
     with connect() as conn:
         f = conn.execute(
-            "SELECT slot, source, basis_time, n_inputs, values, created_at FROM frames" + ONLY +
-            " ORDER BY slot DESC LIMIT 1", (source, source)
+            "SELECT slot, source, basis_time, n_inputs, values, created_at FROM frames" + ONLY + LATEST,
+            (source, source)
         ).fetchone()
     if not f:
         raise HTTPException(404, "아직 프레임이 없습니다")
@@ -298,7 +302,7 @@ def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90)
         return {"inside": False}
     with connect() as conn:
         grid_id, gu, _, _ = cell_at(conn, lon, lat)
-        f = conn.execute("SELECT slot, source, values[%s] FROM frames" + ONLY + " ORDER BY slot DESC LIMIT 1",
+        f = conn.execute("SELECT slot, source, values[%s] FROM frames" + ONLY + LATEST,
                          (grid_id + 1, source, source)).fetchone()   # PostgreSQL 배열은 1부터
         cams = conn.execute("SELECT lon, lat FROM cameras").fetchall()
         station = nearest_station(conn, lon, lat)
@@ -412,7 +416,8 @@ def infer(camera_id: str = Query(min_length=1, max_length=20)):
             out = json.loads(r.stdout.decode("utf-8").strip().splitlines()[-1])
             pm = out["pm25"]
             ok = (isinstance(out, dict) and str(out["camera_id"]) == camera_id and (pm is None or is_num(pm))
-                  and isinstance(out["captured_at"], str))
+                  and (isinstance(out["captured_at"], str)
+                       or (out["captured_at"] is None and pm is None)))   # 밤: 사진을 안 찍어 촬영 시각 없이 사유만(F10)
         except (ValueError, IndexError, KeyError, TypeError):
             ok = False
         if not ok:

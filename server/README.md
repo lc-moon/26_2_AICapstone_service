@@ -65,16 +65,16 @@ TEST_DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/pm_map_test 
 |---|---|
 | `POST /api/ingest/estimates` | 토큰이 틀리면 401, 형식이 틀리면 422(시각은 `+09:00` 같은 시간대 필수, `slot`은 :00/:20/:40). 같은 (camera_id, slot)은 덮어쓰고, 들어온 회차의 프레임을 그 회차 값 전부로 다시 계산 |
 | `GET /api/grid` | `shared/mock/grid.json`과 같은 모양. `boundary`는 `shared/boundary.geojson`의 `area` |
-| `GET /api/frames/latest` | 가장 최근 회차. 프레임이 하나도 없으면 404. **전시용 `?source=cctv`**: 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차), CCTV 프레임이 없으면 404. `cctv` 말고 다른 값은 422 |
+| `GET /api/frames/latest` | 가장 최근 지도 = **자료 시각**(측정소 지도는 `basis_time`, CCTV 지도는 회차 시각)이 가장 늦은 것, 같으면 CCTV(11/8). `/api/point`도 같은 지도를 쓴다. 프레임이 하나도 없으면 404. **전시용 `?source=cctv`**: 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차), CCTV 프레임이 없으면 404. `cctv` 말고 다른 값은 422 |
 | `GET /api/point?lon=&lat=` | `&source=cctv`면 `estimate`만 가장 최근 CCTV 프레임에서(없으면 `estimate: null`, `station`·`camera`는 그대로). 범위 밖(`boundary.geojson`의 `area` 밖)이면 `{"inside": false}`. 안이면 그 칸의 최신 프레임 값·등급·회차·가장 가까운 CCTV 거리. 프레임이 없으면 `estimate: null`. `station` = 가장 가까운 비교용(`use_for_compare`) 측정소의 가장 최근 실측 한 줄. 그 줄이 결측이면 `pm25: null`(이전 시각·다른 측정소로 메우지 않음). 측정값이 하나도 없으면 `pm25`·`data_time`·`period`가 `null`. `camera` = 가장 가까운 화면 범위 카메라(`grid_id` 있음, 103번 제외)의 가장 최근 `estimates` 한 줄과 `photo_url`(`/cam/{id}.jpg?v=촬영 시각 숫자`, `captured_at`이 없으면 회차 시각). 그 카메라 행이 없으면 `null` |
-| `POST /api/infer?camera_id=` | 직접 해보기. `cameras`에 없는 번호는 404(명령에 넘기기 전에 확인, 셸 안 씀). `INFER_CMD` + 번호를 별도 스레드에서 실행(그동안 다른 API는 바로 응답). 한 번에 하나(진행 중 409), 명령 종료 코드 75(정기 추정기가 도는 중)도 409. 같은 카메라 60초 안 재요청은 명령을 다시 돌리지 않고 `cached: true`. 30초 초과·실패·출력이 약속과 다르면 503. 응답 = 명령 출력 + `name`·`grade`·`cached`·`elapsed_s`. DB에 넣지 않음 |
+| `POST /api/infer?camera_id=` | 직접 해보기. `cameras`에 없는 번호는 404(명령에 넘기기 전에 확인, 셸 안 씀). `INFER_CMD` + 번호를 별도 스레드에서 실행(그동안 다른 API는 바로 응답). 한 번에 하나(진행 중 409), 명령 종료 코드 75(정기 추정기가 도는 중)도 409. 같은 카메라 60초 안 재요청은 명령을 다시 돌리지 않고 `cached: true`. 30초 초과·실패·출력이 약속과 다르면 503(밤에 사진 없이 `captured_at`·`pm25`가 둘 다 `null`인 사유 응답은 200). 응답 = 명령 출력 + `name`·`grade`·`cached`·`elapsed_s`. DB에 넣지 않음 |
 | `GET /api/health` | `last_slot`, `last_received_at`, `stale`. stale = 낮에 40분 넘게 추정값이 안 옴(밤과 해 뜬 직후 40분은 false). 낮·밤은 `sun.py`(수집기와 같은 식) |
 
 수신 응답 예: `{"rows_in":19, "rows_upserted":19, "unknown_cameras":[], "new_models":[], "frames":[{"slot":"2026-10-16T13:20:00+09:00","n_inputs":19}]}`
 
 - `cameras`에 없는 카메라 행은 저장하지 않고 `unknown_cameras`와 `ingest_log.error`에 남깁니다
 - 처음 보는 `model`은 `model_versions`에 자동 등록합니다(값을 버리지 않으려고). 응답 `new_models`로 알 수 있음
-- 한 회차의 값이 전부 `null`이면 CCTV 프레임을 만들지 않고(`n_inputs: 0`), 그 회차 이전 가장 최근 실측으로 측정소 프레임을 만듭니다(`source: station`, `basis_time` = 그 실측 시각). 실측도 없으면 프레임 없음. 나중에 CCTV 값이 오면 CCTV 프레임으로 바뀝니다
+- 한 회차의 유효값이 `MIN_CCTV`(10)대 미만이면(전부 `null` 포함) CCTV 프레임을 만들지 않고(응답 `n_inputs`는 유효값 수 그대로), 그 회차 이전 가장 최근 실측으로 측정소 프레임을 만듭니다(`source: station`, `basis_time` = 그 실측 시각). 실측도 없으면 프레임 없음. 나중에 CCTV 값이 오면 CCTV 프레임으로 바뀝니다
 - 측정소 프레임은 이미 있는 CCTV 프레임을 덮어쓰지 않습니다(`ON CONFLICT … WHERE frames.source = 'station'`). 측정소 프레임 계산이 실패해도 추정값 수신은 성공합니다
 
 ## 에어코리아 실측 수집 (`airkorea.py`)
@@ -133,7 +133,7 @@ python airkorea.py      # 결과 요약 출력. 실제 API를 1회(인천·경�
 |---|---|---|
 | 저장소 | `/srv/incheon-air` (`main`) | `.env`는 서버에만(권한 600). DB 비밀번호·수신 토큰은 서버에서 만들어 넣음 |
 | PostgreSQL 16 | DB `pm_map`, 사용자 `pm_map` | localhost만. 메모리 작게(`/etc/postgresql/16/main/conf.d/small.conf`) |
-| API | `incheon-air-api.service` → `127.0.0.1:8001` | uvicorn 1개, `MemoryMax=200M`, 재부팅 시 자동 시작 |
+| API | `incheon-air-api.service` → `127.0.0.1:8001` | uvicorn 1개, `MemoryMax=550M`(11/8 직접 해보기 연결 때 200M에서 올림), 재부팅 시 자동 시작 |
 | Caddy | `/etc/caddy/Caddyfile` | HTTPS 자동. `/api/*`는 API로, `/web/`과 `/shared/boundary.geojson`만 파일로, 나머지는 `/web/`으로 돌림 |
 | 추정기 → API | 수집기 저장소 `.env`의 `SERVICE_API_URL=http://127.0.0.1:8001` | 같은 서버라 인터넷을 거치지 않음 |
 | 방화벽 | GCP `allow-web`(tcp 80·443, 태그 `web`) | DB·API 포트는 밖에서 안 열림 |
