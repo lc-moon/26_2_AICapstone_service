@@ -1,3 +1,4 @@
+import {saveView,takeView} from './view-state.mjs';
 import {initEvidencePins,showEvidencePins,clearEvidencePins} from './evidence-pins.mjs';
 import {renderFrameStatus} from './frame-status.mjs';
 import {apiPath,expoLabel} from './expo.mjs';
@@ -7,6 +8,8 @@ import {renderEvidence} from './evidence.mjs';
 import {GRADES,gradeOf,rgb,validValue,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
 import {cloudImage,veilImage} from './render.mjs';
 const $=id=>document.getElementById(id), params=new URLSearchParams(location.search);
+let restored=null;
+if(params.get('restore')==='1'||performance.getEntriesByType('navigation')[0]?.type==='back_forward'){try{restored=takeView(sessionStorage);}catch{}params.delete('restore');history.replaceState(null,'',location.pathname+(params.size?'?'+params:'')+location.hash);}
 $('about-link').href=`about.html${location.search}`;
 const expo=params.get('expo')==='1';
 const mock=params.get('mode')==='mock', scenario=params.get('scenario')||'day';
@@ -117,6 +120,7 @@ function mobileHome(){
   return {center:[m.lng,m.lat],zoom};
 }
 function wire(){
+ document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||!mapOk)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.endsWith('/about.html')){const c=map.getCenter();try{saveView(sessionStorage,{center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),selection,name:selectionName});}catch{}}});
  void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name)=>void selectPoint(p,true,name)});
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
  $('view-2d').onclick=()=>setView(true);$('view-3d').onclick=()=>setView(false);
@@ -153,10 +157,13 @@ async function start(){
    map.addLayer({id:'cloud',type:'raster',source:'cloud',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],10,.9,15,.5,17,.25],'raster-fade-duration':0}},building||labels);
    initEvidencePins(map,{mock,base});
    map.addSource('pick',{type:'geojson',data:empty});map.addLayer({id:'pick',type:'circle',source:'pick',paint:{'circle-radius':7,'circle-color':'#235954','circle-stroke-color':'#fff','circle-stroke-width':3}});
-   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(selection)showView(false);else home();mapOk=true;mapLoaded();   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다
+   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();mapOk=true;mapLoaded();
+   if(restored?.selection)void selectPoint(restored.selection,false,restored.name);restored=null;   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다
    if(mock&&params.has('sample')){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}
   });
   await refresh();timer=setInterval(()=>void refresh(),60000);
  }catch(e){loadIssue=`화면을 불러올 수 없습니다. ${e.message}`;showStatus();$('retry').onclick=()=>location.reload();}
 }
 addEventListener('pagehide',()=>{disposeInference();clearInterval(timer);clearTimeout(toastTimer);});void start();
+
+addEventListener('pageshow',event=>{if(event.persisted){clearInterval(timer);timer=setInterval(()=>void refresh(),60000);if(selection)void selectPoint(selection,false,selectionName);}});

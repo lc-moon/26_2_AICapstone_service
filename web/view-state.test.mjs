@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {saveView,takeView,validView} from './view-state.mjs';
+const state={center:[126.7,37.4],zoom:14,pitch:40,bearing:-12,selection:[126.6,37.4],name:'송도'};
+test('return state is consumed once including selected name',()=>{const data=new Map(),storage={setItem:(k,v)=>data.set(k,v),getItem:k=>data.get(k),removeItem:k=>data.delete(k)};saveView(storage,state);assert.deepEqual(takeView(storage),state);assert.equal(takeView(storage),null);});
+test('corrupt or blocked storage falls back to first view',()=>{assert.equal(validView({...state,zoom:NaN}),false);assert.equal(validView({...state,selection:[0,100]}),false);assert.equal(takeView({getItem:()=>'{',removeItem:()=>{}}),null);assert.doesNotThrow(()=>saveView({setItem:()=>{throw Error();}},state));});
