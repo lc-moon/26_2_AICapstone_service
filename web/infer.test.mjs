@@ -7,7 +7,7 @@ test('live inference sends one POST with correct camera',async()=>{
  let count=0;const result=await requestInference('10042',{base:'https://example.test',signal:new AbortController().signal,fetcher:async(url,options)=>{count++;assert.equal(url,'https://example.test/api/infer?camera_id=10042');assert.equal(options.method,'POST');return {ok:true,json:async()=>sample};}});
  assert.equal(count,1);assert.equal(result.pm25,14.1);
 });
-test('busy and unavailable messages differ',()=>{assert.match(inferFailure(409),/다른 분/);assert.match(inferFailure(503),/기존 회차/);});
+test('busy and unavailable messages differ',()=>{assert.match(inferFailure(409),/다른 분/);assert.match(inferFailure(503),/마지막 회차/);});
 test('mock rain preserves null and explanatory status',async()=>{
  const rain={...sample,pm25:null,status:'비 — 추정 안 함'};
  const result=await requestInference('10042',{mock:true,scenario:'infer_rain',mockDelay:0,signal:new AbortController().signal,fetcher:async()=>({ok:true,json:async()=>rain})});assert.equal(result.pm25,null);assert.equal(result.status,rain.status);
@@ -19,3 +19,5 @@ test('F10 night answer without photo is accepted, value with no photo is not',()
  assert.equal(validateInference(night,'10042').status,'밤 — 추정 안 함');
  assert.throws(()=>validateInference({...night,pm25:3},'10042'));
 });
+
+test('expo night mock answers like the server at night',async()=>{const r=await requestInference('10042',{mock:true,expo:true,scenario:'night',signal:new AbortController().signal});assert.equal(r.captured_at,null);assert.match(r.status,/밤/);});

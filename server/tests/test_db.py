@@ -476,7 +476,7 @@ def state_of(client):
 
 def test_state_normal_keys_match_next(client, db):
     post(client, screen_rows(db, (19, "정상", 10.0)))
-    assert state_of(client) == ("cctv", "normal", {"valid": 19, "total": 19})
+    assert state_of(client) == ("cctv", "normal", {"valid": 19, "total": 20})
     assert client.get("/api/frames/latest").json().keys() == mock("next/frames_latest.json").keys()
 
 
@@ -485,9 +485,9 @@ def test_state_night_is_null(client, db, monkeypatch):
     f = client.get("/api/frames/latest").json()
     assert (f["source"], f["reason"], f["cctv"]) == ("station", "night", None)
     assert f.keys() == mock("next/frames_latest_night.json").keys()
-    # ?source=cctv는 같은 필드, 항상 normal. 103번은 세지 않고 124번은 이 회차에 없어 18/19
+    # ?source=cctv는 같은 필드, 항상 normal. 103번까지 세고 124번은 이 회차에 없어 19/20
     c = client.get("/api/frames/latest", params={"source": "cctv"}).json()
-    assert (c["source"], c["reason"], c["cctv"]) == ("cctv", "normal", {"valid": 18, "total": 19})
+    assert (c["source"], c["reason"], c["cctv"]) == ("cctv", "normal", {"valid": 19, "total": 20})
 
 
 @pytest.mark.parametrize("groups, reason, valid, example", [
@@ -500,13 +500,13 @@ def test_state_night_is_null(client, db, monkeypatch):
     ([(10, RAIN, None), (9, HUMID, None)], "rain", 0, "frames_latest_rain.json"),
     ([(5, RAIN, None), (14, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
     ([(7, RAIN, None), (7, HUMID, None), (5, WX_MISSING, None)], "rain", 0, "frames_latest_rain.json"),     # 같은 수: rain > humidity
-    ([(5, RAIN, None), (7, HUMID, None), (7, WX_MISSING, None)], "humidity", 0, "frames_latest_rain.json"),  # 같은 수: humidity > no_data
-    ([(5, RAIN, None), (5, HUMID, None)], "no_data", 0, "frames_latest_rain.json"),                         # 행이 없는 9대는 no_data
+    ([(4, RAIN, None), (8, HUMID, None), (7, WX_MISSING, None)], "humidity", 0, "frames_latest_rain.json"),  # 같은 수(103번 포함 no_data 8): humidity > no_data
+    ([(5, RAIN, None), (5, HUMID, None)], "no_data", 0, "frames_latest_rain.json"),                         # 행이 없는 10대(103번 포함)는 no_data
 ])
 def test_state_day_station(client, db, groups, reason, valid, example):
     obs(db, ("아암", "2026-10-16T13:00+09", 11))
     post(client, screen_rows(db, *groups))
-    assert state_of(client) == ("station", reason, {"valid": valid, "total": 19})
+    assert state_of(client) == ("station", reason, {"valid": valid, "total": 20})
     assert client.get("/api/frames/latest").json().keys() == mock("next/" + example).keys()
 
 

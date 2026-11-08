@@ -60,6 +60,9 @@ export function clearEvidencePins(){
   overlay?.replaceChildren();mapRef?.getSource('ev-link')?.setData(empty);
 }
 
+// 상세를 연 채 패널을 다시 그릴 때(새 회차) 물러난 시점을 되돌린다
+export function restoreEvidenceView(){if(saved)mapRef.easeTo({...saved,duration:300,essential:true});}
+
 function links(){
   const list=active?[active]:[];
   mapRef.getSource('ev-link').setData({type:'FeatureCollection',features:list.map(t=>({type:'Feature',properties:{color:COLOR[t.type]},geometry:{type:'LineString',coordinates:[t.point,t.at]}}))});
@@ -158,7 +161,8 @@ function boxFree(b,W,H,B){
   const xs=[b.l,b.l+W/2,b.l+W],ys=[b.t,b.t+H/2,b.t+H];
   return xs.every(x=>ys.every(y=>free(x,y,B,10)));
 }
-function boxSize(t){const box=t.box;return {W:box?.offsetWidth||228,H:box?.offsetHeight||(t.type==='cctv'?260:140)};}
+const hitsPick=(b,W,H,p)=>p.x>b.l-24&&p.x<b.l+W+24&&p.y>b.t-24&&p.y<b.t+H+24;   // 상세 상자가 선택한 곳을 덮지 않게
+function boxSize(t){const box=t.box,min=t.type==='cctv'?260:140;return {W:box?.offsetWidth||228,H:Math.max(box?.offsetHeight||0,min)};}   // 사진이 뜨기 전 높이로 재지 않게
 
 // 선택한 곳을 화면의 같은 자리에 둔 채, 목표와 상세 상자가 다 보이는 가장 큰 줌을 찾는다
 function anchoredView(t){
@@ -166,22 +170,23 @@ function anchoredView(t){
   measuring=true;
   const at=z=>{map.jumpTo({center:start.center,zoom:z});const f=map.project(t.point),cs=map.project(map.getCenter());
     map.setCenter(map.unproject([cs.x+f.x-f0.x,cs.y+f.y-f0.y]));const q=map.project(t.at);
-    return {center:map.getCenter(),ok:seen(q,B,40,16)&&spots(q,W,H).some(b=>boxFree(b,W,H,B))};};
-  let best=null;
-  if(at(start.zoom).ok)best={center:start.center,zoom:start.zoom};
-  else{let lo=start.zoom-6,hi=start.zoom;for(let i=0;i<14;i++){const z=(lo+hi)/2,r=at(z);if(r.ok){lo=z;best={center:r.center,zoom:z};}else hi=z;}}
+    const visible=seen(q,B,40,16);
+    return {center:map.getCenter(),visible,ok:visible&&spots(q,W,H).some(b=>boxFree(b,W,H,B)&&!hitsPick(b,W,H,f0))};};
+  // 상자가 들어가는지는 줌에 따라 한 방향으로 변하지 않아 이분 탐색이 답을 놓친다. 조금씩 물러나며 처음 되는 줌을 쓴다
+  let best=null,shown=null;
+  for(let z=start.zoom;z>=start.zoom-6&&!best;z-=.2){const r=at(z);if(r.ok)best={center:r.center,zoom:z};else if(r.visible&&!shown)shown={center:r.center,zoom:z};}
   map.jumpTo(start);measuring=false;
-  return best;
+  return best||shown;
 }
 
 function placeDetail(t){
   const box=t.box;if(!box)return;
-  const B=blockers(),{W,H}=boxSize(t),q=mapRef.project(t.at),c=mapRef.getContainer();
-  let b=spots(q,W,H).find(x=>boxFree(x,W,H,B));
+  const B=blockers(),{W,H}=boxSize(t),q=mapRef.project(t.at),c=mapRef.getContainer(),p=mapRef.project(t.point);
+  let b=spots(q,W,H).find(x=>boxFree(x,W,H,B)&&!hitsPick(x,W,H,p));
   if(!b){
     // When the phone cannot fit a full popup, use a scrollable box in free map space.
     for(let y=12;y<c.clientHeight-90&&!b;y+=16)for(let x=12;x<=c.clientWidth-W-12;x+=16){
-      if(boxFree({l:x,t:y},W,Math.min(H,100),B)){b={l:x,t:y};break;}
+      if(boxFree({l:x,t:y},W,Math.min(H,100),B)&&!hitsPick({l:x,t:y},W,Math.min(H,100),p)){b={l:x,t:y};break;}
     }
   }
   b??={l:Math.max(12,c.clientWidth-W-12),t:12};
