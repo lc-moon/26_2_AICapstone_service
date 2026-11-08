@@ -105,9 +105,11 @@ def test_cors_blocks_others(client, origin):
     assert ACAO not in client.get("/openapi.json", headers={"Origin": origin}).headers
 
 
-def test_cors_preflight_get_only(client):
+def test_cors_preflight_get_post_only(client):
     pre = {"Origin": "http://localhost:8766", "Access-Control-Request-Method": "GET"}
     r = client.options("/api/grid", headers=pre)
     assert r.status_code == 200 and r.headers[ACAO] == "http://localhost:8766"
-    assert client.options("/api/ingest/estimates", headers={**pre, "Access-Control-Request-Method": "POST"}).status_code == 400
+    # 직접 해보기(POST /api/infer)는 로컬 화면에서도 부를 수 있게. 그 밖의 메서드는 막힘
+    assert client.options("/api/infer", headers={**pre, "Access-Control-Request-Method": "POST"}).status_code == 200
+    assert client.options("/api/infer", headers={**pre, "Access-Control-Request-Method": "DELETE"}).status_code == 400
     assert ACAO not in client.options("/api/grid", headers={**pre, "Origin": "http://evil.example"}).headers
