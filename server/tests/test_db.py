@@ -335,3 +335,46 @@ def test_station_frame_error_does_not_break_ingest(client, db, monkeypatch):
     post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])   # 200
     assert count(db, "SELECT count(*) FROM estimates") == 19 and count(db, "SELECT count(*) FROM frames") == 0
     assert count(db, "SELECT error FROM ingest_log") is None
+
+
+# ── S10: 전시용 ?source=cctv ───────────────────────────────────
+
+def night_after_cctv(client, db, monkeypatch):
+    """13:20 CCTV 회차 + 그보다 최근인 21:00 밤 측정소 프레임"""
+    import app
+    post(client, mock("ingest_estimates.json")["rows"])
+    obs(db, *NIGHT_OBS)
+    at(monkeypatch, 2026, 10, 16, 21, 50)
+    assert app.night_frame() == 2
+
+
+def test_source_cctv_skips_newer_station_frame(client, db, monkeypatch):
+    night_after_cctv(client, db, monkeypatch)
+    got = client.get("/api/frames/latest", params={"source": "cctv"}).json()
+    want = mock("frames_latest.json")
+    assert {k: got[k] for k in ("slot", "source", "basis_time", "n_inputs", "values")} == \
+           {k: want[k] for k in ("slot", "source", "basis_time", "n_inputs", "values")}
+    p = client.get("/api/point", params={**SONGDO, "source": "cctv"}).json()
+    assert p["estimate"] == mock("point_inside.json")["estimate"]   # 13:20 CCTV 회차 값
+    plain = client.get("/api/point", params=SONGDO).json()
+    assert (p["station"], p["camera"]) == (plain["station"], plain["camera"])   # 실측·사진은 그대로
+
+
+def test_no_source_unchanged(client, db, monkeypatch):
+    night_after_cctv(client, db, monkeypatch)
+    f = client.get("/api/frames/latest").json()
+    assert (f["slot"], f["source"], f["basis_time"]) == \
+           ("2026-10-16T21:00:00+09:00", "station", "2026-10-16T21:00:00+09:00")
+    e = client.get("/api/point", params=SONGDO).json()["estimate"]
+    assert (e["slot"], e["source"]) == ("2026-10-16T21:00:00+09:00", "station")
+
+
+def test_source_cctv_without_cctv_frame(client, db, monkeypatch):
+    import app
+    obs(db, *NIGHT_OBS)
+    at(monkeypatch, 2026, 10, 16, 21, 50)
+    app.night_frame()   # 측정소 프레임만 있음 — 가짜 CCTV 값을 만들지 않는다
+    assert client.get("/api/frames/latest").status_code == 200
+    assert client.get("/api/frames/latest", params={"source": "cctv"}).status_code == 404
+    assert client.get("/api/point", params={**SONGDO, "source": "cctv"}).json()["estimate"] is None
+    assert client.get("/api/point", params=SONGDO).json()["estimate"]["source"] == "station"

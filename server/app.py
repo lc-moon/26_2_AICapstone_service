@@ -12,7 +12,7 @@ import time
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -260,11 +260,17 @@ def grid():
     return {"cell_size_m": 1000, "count": len(cells), "cells": cells, "boundary": boundary()}
 
 
+# 전시용(S10): source=cctv면 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차). source가 없으면 가장 최근 프레임. 다른 값은 422
+Source = Annotated[Optional[Literal["cctv"]], Query()]
+ONLY = " WHERE (%s::text IS NULL OR source = %s)"
+
+
 @app.get("/api/frames/latest")
-def frames_latest():
+def frames_latest(source: Source = None):
     with connect() as conn:
         f = conn.execute(
-            "SELECT slot, source, basis_time, n_inputs, values, created_at FROM frames ORDER BY slot DESC LIMIT 1"
+            "SELECT slot, source, basis_time, n_inputs, values, created_at FROM frames" + ONLY +
+            " ORDER BY slot DESC LIMIT 1", (source, source)
         ).fetchone()
     if not f:
         raise HTTPException(404, "아직 프레임이 없습니다")
@@ -287,13 +293,13 @@ def cell_at(conn, lon, lat):
 
 
 @app.get("/api/point")
-def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90)):
+def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90), source: Source = None):
     if not inside_area(lon, lat):
         return {"inside": False}
     with connect() as conn:
         grid_id, gu, _, _ = cell_at(conn, lon, lat)
-        f = conn.execute("SELECT slot, source, values[%s] FROM frames ORDER BY slot DESC LIMIT 1",
-                         (grid_id + 1,)).fetchone()   # PostgreSQL 배열은 1부터
+        f = conn.execute("SELECT slot, source, values[%s] FROM frames" + ONLY + " ORDER BY slot DESC LIMIT 1",
+                         (grid_id + 1, source, source)).fetchone()   # PostgreSQL 배열은 1부터
         cams = conn.execute("SELECT lon, lat FROM cameras").fetchall()
         station = nearest_station(conn, lon, lat)
         camera = nearest_camera(conn, lon, lat)

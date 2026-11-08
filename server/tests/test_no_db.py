@@ -113,3 +113,10 @@ def test_cors_preflight_get_post_only(client):
     assert client.options("/api/infer", headers={**pre, "Access-Control-Request-Method": "POST"}).status_code == 200
     assert client.options("/api/infer", headers={**pre, "Access-Control-Request-Method": "DELETE"}).status_code == 400
     assert ACAO not in client.options("/api/grid", headers={**pre, "Origin": "http://evil.example"}).headers
+
+
+@pytest.mark.parametrize("value", ["station", "CCTV", "", "cctv,station"])
+def test_source_other_values_422(client, value):
+    # S10: source는 cctv만. DB에 닿기 전에 거절
+    assert client.get("/api/frames/latest", params={"source": value}).status_code == 422
+    assert client.get("/api/point", params={"lon": 126.6395, "lat": 37.3935, "source": value}).status_code == 422
