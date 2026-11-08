@@ -1,3 +1,4 @@
+import {renderFrameStatus} from './frame-status.mjs';
 import {apiPath,expoLabel} from './expo.mjs';
 import {mountSearch} from './search.mjs';
 import {mountInference} from './infer.mjs';
@@ -25,7 +26,15 @@ async function json(url,{allow404=false}={}){
  finally{clearTimeout(timeout);}
 }
 const fixture=name=>json(`../shared/mock/${name}.json`);
-async function frameData(){if(mock)return scenario==='empty'?null:fixture(scenario==='night'&&!expo?'frames_latest_night':'frames_latest');return json(`${base}${apiPath('/api/frames/latest',{expo})}`,{allow404:true});}
+async function frameData(){
+ if(!mock)return json(`${base}${apiPath('/api/frames/latest',{expo})}`,{allow404:true});
+ if(scenario==='empty')return null;
+ if(scenario==='legacy')return fixture('frames_latest');
+ const names={night:'frames_latest_night',rain:'frames_latest_rain',few:'frames_latest_few',few_cameras:'frames_latest_few'};
+ const frame=await fixture(`next/${expo?'frames_latest':names[scenario]||'frames_latest'}`);
+ if(['humidity','no_data'].includes(scenario)&&!expo){const station=await fixture('next/frames_latest_rain');return {...station,reason:scenario};}
+ return frame;
+}
 function showStatus(){
  const messages=[loadIssue,healthIssue,mapIssue];
  if(health?.stale){const age=current?Math.max(0,Math.floor((Date.now()-Date.parse(current.slot))/60000)):null;messages.push(mock?'갱신 지연 예시 · 40분 이상 새 추정값이 없습니다.':`갱신 지연 · ${age===null?'40분 이상':age+'분 전'} 값입니다.`);}
@@ -35,7 +44,7 @@ function ago(t){const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?
  if(!current){$('time').textContent=expo?expoLabel(null):'아직 값 없음';$('source').textContent='첫 데이터가 들어오면 자동으로 표시합니다.';return;}
  $('time').textContent=expo?expoLabel(current):`${formatTime(current.basis_time||current.slot)} 기준${ago(current.basis_time||current.slot)}`;
  // source=station can also mean daytime missing-camera fallback; do not infer night.
- $('source').textContent=current.source==='station'?`${mock&&scenario==='night'?'밤 · ':'밤·결측 대체 · '}측정소 실측 기반 보간${mock?' · 예시값':''}`:'CCTV 영상 기반 추정 · 20분 회차 / 1분마다 확인';
+ renderFrameStatus($('source'),current,current.source==='station'?`${mock&&scenario==='night'?'밤 · ':'밤·결측 대체 · '}측정소 실측 기반 보간${mock?' · 예시값':''}`:'CCTV 영상 기반 추정 · 20분 회차 / 1분마다 확인');
 }
 function draw(){const image=cloudImage(grid,current?.values||grid.cells.map(()=>null),layout);if(map.getSource('cloud'))map.getSource('cloud').updateImage(image);}
 async function refresh(){
