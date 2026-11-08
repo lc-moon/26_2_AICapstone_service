@@ -84,7 +84,7 @@ export function showEvidencePins(map,point,data){
 // 실제로 화면을 가리는 것들(지도 기준 좌표)
 function blockers(){
   const c=mapRef.getContainer().getBoundingClientRect();
-  return ['#panel','#title','#place-search','#legend','#status','.tools','.maplibregl-ctrl-top-right','#toast']
+  return ['#panel','#title','#search-toggle','#place-search','#legend','#status','.tools','.maplibregl-ctrl-top-right','#toast']
     .map(s=>document.querySelector(s)).filter(e=>e&&!e.hidden&&e.getClientRects().length>0)
     .map(e=>{const r=e.getBoundingClientRect();return {l:r.left-c.left-8,t:r.top-c.top-8,r:r.right-c.left+8,b:r.bottom-c.top+8};});
 }

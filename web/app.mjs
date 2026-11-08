@@ -128,9 +128,16 @@ function mobileHome(){
   map.jumpTo(save);
   return {center:[m.lng,m.lat],zoom};
 }
+function toggleSearch(open){
+ document.body.classList.toggle('search-open',open);$('search-toggle').setAttribute('aria-expanded',String(open));$('search-toggle').setAttribute('aria-label',open?'장소 검색 닫기':'장소 검색 열기');
+ if(open)$('place-query').focus();else $('search-toggle').focus();
+ if(mapOk&&!selection&&matchMedia('(max-width:700px)').matches)home();
+}
 function wire(){
+ $('search-toggle').onclick=()=>toggleSearch(!document.body.classList.contains('search-open'));
+ $('place-search').addEventListener('keydown',event=>{if(event.key==='Escape'&&matchMedia('(max-width:700px)').matches){event.stopPropagation();toggleSearch(false);}});
  document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||!mapOk)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.endsWith('/about.html')){const c=map.getCenter();try{saveView(sessionStorage,{center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding(),selection,name:selectionName});}catch{}}});
- void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name)=>void selectPoint(p,true,name)});
+ void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name)=>{void selectPoint(p,true,name);if(matchMedia('(max-width:700px)').matches)toggleSearch(false);}});
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
  $('view-2d').onclick=()=>setView(true);$('view-3d').onclick=()=>setView(false);
  $('retry').onclick=()=>{if(mapIssue)location.reload();else void refresh();};
