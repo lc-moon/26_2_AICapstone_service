@@ -62,9 +62,21 @@ def keyword_by_area(client, monkeypatch, in_area, nationwide):
 
 def test_common_name_found_in_area_first(client, monkeypatch):
     # 전국 상위 5개가 모두 인천 밖이어도 범위 안 결과를 쓴다
-    seen = keyword_by_area(client, monkeypatch, [INHA], [SEOUL] * 5)
+    seen = keyword_by_area(client, monkeypatch, [{**INHA, "place_name": "홈플러스 구월점"}], [SEOUL] * 5)
     got = client.get("/api/search", params={"q": "홈플러스"}).json()
-    assert got["status"] == "ok" and got["results"][0]["name"] == "인하대학교" and len(seen) == 2   # 전국 검색은 안 함
+    assert got["status"] == "ok" and got["results"][0]["name"] == "홈플러스 구월점" and len(seen) == 2   # 전국 검색은 안 함
+
+
+def test_area_result_without_query_in_name_is_ignored(client, monkeypatch):
+    # 카카오가 범위 안에서 비슷하게 맞춘 곳만 돌려주면 쓰지 않고 전국 결과로 판단한다(11/8 실서버 "서울역")
+    seen = keyword_by_area(client, monkeypatch, [{**INHA, "place_name": "서울보청기 만수역점"}], [SEOUL])
+    got = client.get("/api/search", params={"q": "서울역"}).json()
+    assert (got["status"], got["results"], len(seen)) == ("outside_incheon", [], 3)
+
+
+def test_name_match_ignores_spaces_and_case(client, monkeypatch):
+    keyword_by_area(client, monkeypatch, [{**INHA, "place_name": "CGV 인천 연수"}], [SEOUL])
+    assert client.get("/api/search", params={"q": "cgv인천"}).json()["status"] == "ok"
 
 
 @pytest.mark.parametrize("q, doc, status", [("서울역", SEOUL, "outside_incheon"), ("강화도", GANGHWA, "outside_area")])

@@ -458,13 +458,16 @@ def kakao_docs(client, key, kind, **params):
 def kakao_search(key, q):
     """주소 검색(지번·도로명), 결과가 없으면 키워드 검색(장소 이름). [(이름, 주소, x, y)]
     키워드는 서비스 범위 안을 먼저 찾는다. 전국에서 5개만 받으면 "홈플러스"처럼 흔한 이름이 전부 인천 밖으로 나온다.
-    범위 안에 없을 때만 전국을 찾아 "인천 밖"·"범위 밖"을 구분한다"""
+    범위 안 결과는 검색어가 이름에 든 것만 쓴다(카카오는 "서울역"에 범위 안의 "서울보청기 만수역점"을 돌려준다).
+    없으면 전국을 찾아 "인천 밖"·"범위 밖"을 구분한다"""
+    compact = lambda s: "".join(s.split()).lower()
     with kakao_client() as c:
         docs = kakao_docs(c, key, "address", query=q)
         if docs:
             return [(d["address_name"], (d.get("road_address") or {}).get("address_name") or d["address_name"],
                      d["x"], d["y"]) for d in docs]
-        docs = (kakao_docs(c, key, "keyword", query=q, size=15, rect=area_rect())
+        docs = ([d for d in kakao_docs(c, key, "keyword", query=q, size=15, rect=area_rect())
+                 if compact(q) in compact(d["place_name"])]
                 or kakao_docs(c, key, "keyword", query=q, size=5))
         return [(d["place_name"], d.get("road_address_name") or d["address_name"], d["x"], d["y"]) for d in docs]
 
