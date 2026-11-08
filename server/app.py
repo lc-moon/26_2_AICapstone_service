@@ -407,9 +407,12 @@ def nearest_camera(conn, lon, lat, frame):
     slot, captured, pm, status = row
     # ?v= 는 브라우저 캐시 깨기용(한국 시각 숫자). captured_at이 비어 있으면 회차 시각으로
     v = (captured or slot).astimezone(KST).strftime("%Y%m%d%H%M%S")
+    # 사진 파일은 카메라당 1장이고 회차마다 덮어쓴다. 이 행보다 새 회차가 있으면(전시 주소에서 낮에 비가 온 뒤 등)
+    # 파일은 이미 다른 시각의 사진이므로 이 행의 촬영 시각·값에 붙여 내보내지 않는다
+    newer = conn.execute("SELECT 1 FROM estimates WHERE camera_id = %s AND slot > %s LIMIT 1", (cid, slot)).fetchone()
     return {"camera_id": cid, "name": name, "distance_km": round(d, 1), "slot": iso(slot),
             "captured_at": iso(captured), "pm25": None if pm is None else round(pm, 1), "status": status,
-            "photo_url": f"/cam/{cid}.jpg?v={v}", "lon": x, "lat": y, "nearest": nearest}
+            "photo_url": None if newer else f"/cam/{cid}.jpg?v={v}", "lon": x, "lat": y, "nearest": nearest}
 
 
 def period(t):

@@ -565,3 +565,14 @@ def test_station_map_keeps_nearest_camera_latest_row(client, db, monkeypatch):
     # ?source=cctv면 그 CCTV 지도 기준으로 건너뜀
     c = point_at(client, source="cctv")["camera"]
     assert (c["camera_id"], c["slot"], c["nearest"]["reason"]) == ("10042", "2026-10-16T13:20:00+09:00", "no_feed")
+
+
+def test_photo_hidden_when_file_is_newer_than_row(client, db):
+    # 13:20 CCTV 지도 뒤 13:40이 비: 사진 파일은 13:40으로 덮였으므로 13:20 값·시각에 붙이지 않는다
+    rows = mock("ingest_estimates.json")["rows"]
+    post(client, rows)
+    assert point_at(client, source="cctv")["camera"]["photo_url"]
+    post(client, [{**r, "slot": "2026-10-16T13:40:00+09:00", "captured_at": "2026-10-16T13:40:14+09:00",
+                   "pm25_est": None, "status": RAIN} for r in rows])
+    c = point_at(client, source="cctv")["camera"]
+    assert (c["slot"], c["pm25"], c["photo_url"]) == ("2026-10-16T13:20:00+09:00", 9.2, None)
