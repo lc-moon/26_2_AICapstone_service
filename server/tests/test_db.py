@@ -209,3 +209,98 @@ def test_cors_on_real_endpoint(client, db):
     r = client.get("/api/frames/latest", headers={"Origin": "http://localhost:8766"})
     assert r.status_code == 404 and r.headers["access-control-allow-origin"] == "http://localhost:8766"
     assert "access-control-allow-origin" not in client.get("/api/frames/latest", headers={"Origin": "http://evil.example"}).headers
+
+
+# ── S2: 밤·빈 회차 = 측정소 프레임 ─────────────────────────────
+
+NIGHT_OBS = [("아암", "2026-10-16T21:00+09", 12), ("송도", "2026-10-16T21:00+09", 10),
+             ("동춘", "2026-10-16T21:00+09", None),   # 결측은 입력에서 뺀다
+             ("아암", "2026-10-16T20:00+09", 40)]     # 다른 시각은 쓰지 않는다
+
+
+def at(monkeypatch, *a):
+    from datetime import datetime, timedelta, timezone
+    import app
+    monkeypatch.setattr(app, "now", lambda: datetime(*a, tzinfo=timezone(timedelta(hours=9))))
+
+
+def frame(db, slot):
+    return db.execute("SELECT source, basis_time, n_inputs, inputs FROM frames WHERE slot = %s", (slot,)).fetchone()
+
+
+def test_night_station_frame_matches_mock_shape(client, db, monkeypatch):
+    import app
+    from idw import idw
+    obs(db, *NIGHT_OBS)
+    at(monkeypatch, 2026, 10, 16, 21, 50)
+    assert app.night_frame() == 2
+    got, want = client.get("/api/frames/latest").json(), mock("frames_latest_night.json")
+    assert got.keys() == want.keys()
+    assert (got["slot"], got["source"], got["basis_time"], got["n_inputs"]) == \
+           ("2026-10-16T21:00:00+09:00", "station", "2026-10-16T21:00:00+09:00", 2)
+    st = {n: (x, y) for n, x, y in db.execute("SELECT station_name, lon, lat FROM stations")}
+    centers = [c["center"] for c in mock("grid.json")["cells"]]
+    assert got["values"] == idw(centers, [(*st["송도"], 10), (*st["아암"], 12)])
+    assert len(got["values"]) == 456 and got["updated_at"].endswith("+09:00")
+    # 같은 시각에 다시 돌아도 한 줄
+    assert app.night_frame() == 2 and count(db, "SELECT count(*) FROM frames") == 1
+
+
+def test_night_frame_only_at_night(client, db, monkeypatch):
+    import app
+    obs(db, *NIGHT_OBS)
+    at(monkeypatch, 2026, 10, 16, 13, 50)
+    assert app.night_frame() == 0 and count(db, "SELECT count(*) FROM frames") == 0
+
+
+def test_night_frame_without_observations(client, db, monkeypatch):
+    import app
+    at(monkeypatch, 2026, 10, 16, 21, 50)
+    obs(db, ("아암", "2026-10-16T21:00+09", None))   # 결측뿐이어도 값을 만들지 않는다
+    assert app.night_frame() == 0 and count(db, "SELECT count(*) FROM frames") == 0
+    assert client.get("/api/frames/latest").status_code == 404
+
+
+def test_station_frame_never_overwrites_cctv(client, db, monkeypatch):
+    # 해 뜰 무렵 07:00 = 정시 측정소 슬롯이자 CCTV 회차
+    import app
+    rows = [{**r, "slot": "2026-10-16T07:00:00+09:00"} for r in mock("ingest_estimates.json")["rows"]]
+    post(client, rows)
+    before = db.execute("SELECT values::float8[] FROM frames").fetchone()[0]
+    obs(db, ("아암", "2026-10-16T07:00+09", 50))
+    assert app.station_frame(db, "2026-10-16T07:00+09", "2026-10-16T07:00+09") == 0
+    at(monkeypatch, 2026, 10, 16, 21, 50)   # 밤 경로로 돌아도 (07:00이 가장 최근 실측)
+    assert app.night_frame() == 0
+    assert frame(db, "2026-10-16T07:00+09")[:3] == ("cctv", None, 19)
+    assert db.execute("SELECT values::float8[] FROM frames").fetchone()[0] == before
+
+
+def test_empty_day_slot_uses_latest_obs_then_cctv_wins(client, db):
+    rows = mock("ingest_estimates.json")["rows"]   # 13:20 회차
+    obs(db, ("아암", "2026-10-16T12:00+09", 30), ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9),
+        ("아암", "2026-10-16T14:00+09", 99))   # 회차보다 뒤 시각은 쓰지 않는다
+    res = post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])
+    assert res["frames"] == [{"slot": "2026-10-16T13:20:00+09:00", "n_inputs": 0}]   # 수신 응답 모양은 그대로
+    source, basis, n, inputs = frame(db, "2026-10-16T13:20+09")
+    assert (source, client.get("/api/frames/latest").json()["basis_time"], n, inputs) == \
+           ("station", "2026-10-16T13:00:00+09:00", 2, ["송도", "아암"])
+    # 나중에 CCTV 값이 오면(습도 결측 행은 약 1시간 뒤) CCTV 프레임으로 바뀐다
+    post(client, rows)
+    assert frame(db, "2026-10-16T13:20+09")[:3] == ("cctv", None, 19)
+    assert client.get("/api/frames/latest").json()["values"] == mock("frames_latest.json")["values"]
+    # 다시 전부 null이 되면 측정소로 되돌아감. 회차당 한 줄
+    post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])
+    assert frame(db, "2026-10-16T13:20+09")[0] == "station" and count(db, "SELECT count(*) FROM frames") == 1
+
+
+def test_station_frame_error_does_not_break_ingest(client, db, monkeypatch):
+    import app
+    obs(db, ("아암", "2026-10-16T13:00+09", 11))
+
+    def boom(*a):
+        raise RuntimeError("측정소 프레임 실패")
+    monkeypatch.setattr(app, "station_frame", boom)
+    rows = mock("ingest_estimates.json")["rows"]
+    post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])   # 200
+    assert count(db, "SELECT count(*) FROM estimates") == 19 and count(db, "SELECT count(*) FROM frames") == 0
+    assert count(db, "SELECT error FROM ingest_log") is None

@@ -72,7 +72,8 @@ TEST_DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/pm_map_test 
 
 - `cameras`에 없는 카메라 행은 저장하지 않고 `unknown_cameras`와 `ingest_log.error`에 남깁니다
 - 처음 보는 `model`은 `model_versions`에 자동 등록합니다(값을 버리지 않으려고). 응답 `new_models`로 알 수 있음
-- 한 회차의 값이 전부 `null`이면 그 회차 CCTV 프레임을 만들지 않습니다(`n_inputs: 0`). 측정소로 메우는 것은 다음 PR
+- 한 회차의 값이 전부 `null`이면 CCTV 프레임을 만들지 않고(`n_inputs: 0`), 그 회차 이전 가장 최근 실측으로 측정소 프레임을 만듭니다(`source: station`, `basis_time` = 그 실측 시각). 실측도 없으면 프레임 없음. 나중에 CCTV 값이 오면 CCTV 프레임으로 바뀝니다
+- 측정소 프레임은 이미 있는 CCTV 프레임을 덮어쓰지 않습니다(`ON CONFLICT … WHERE frames.source = 'station'`). 측정소 프레임 계산이 실패해도 추정값 수신은 성공합니다
 
 ## 에어코리아 실측 수집 (`airkorea.py`)
 
@@ -118,7 +119,9 @@ python airkorea.py      # 결과 요약 출력. 실제 API를 1회(인천·경�
 화면을 `http://localhost:8766/web/?api=http://localhost:8000`처럼 다른 포트에서 띄워 API를 부를 수 있게,
 `http://localhost:포트`와 `http://127.0.0.1:포트`에서 오는 `GET`만 허용합니다(`*`는 쓰지 않음). 배포 서버는 화면과 API가 같은 주소라 상관없습니다.
 
-아직: 밤·빈 회차 → **이어서 할 일은 [NEXT.md](NEXT.md)**
+**밤 측정소 프레임**: 매시 수집이 끝나면(`run_hourly(after=night_frame)`) 밤(`sun.py`의 `is_day()`가 false)일 때 값이 있는 가장 최근 정시 실측으로 프레임을 만듭니다. `slot` = `basis_time` = 그 `data_time`, 입력은 그 시각에 PM2.5가 있는 측정소 전부(53곳 중), 보간은 CCTV와 같은 IDW
+
+**이어서 할 일은 [NEXT.md](NEXT.md)**
 
 ## 배포 (2026-10-27, 팀장)
 
