@@ -1,3 +1,4 @@
+import {nearestMessage} from './nearest.mjs';
 import {formatTime,gradeOf,validValue,rgb,adviceFor} from './core.mjs';
 
 export function element(tag, content, className) {
@@ -35,7 +36,7 @@ export function cameraFigure(camera, options) {
 }
 
 export function renderEvidence(host,data,options={}) {
-  host.replaceChildren(element('h2',`${data.gu || '선택한 위치'} 부근`,'place'));
+  host.replaceChildren(element('h2',options.placeName?`${options.placeName} · ${data.gu||'선택한 위치'}`:`${data.gu || '선택한 위치'} 부근`,'place'));
   const columns = element('div',null,'evidence-columns');
   const estimate = element('section',null,'evidence-section');
   estimate.append(element('h3','선택한 곳의 추정 농도'));
@@ -53,6 +54,7 @@ export function renderEvidence(host,data,options={}) {
   const observation = element('section',null,'evidence-section');
   observation.append(element('h3','가까운 측정소 실측'));
   const s=data.station;
+  if(s?.nearest)observation.append(element('p',nearestMessage(s,'station'),'nearest-note'));
   if(s) observation.append(element('h4',s.name),element('div',concentration(s.pm25),'value'));
   if(s&&validValue(s.pm25)){const g=gradeOf(s.pm25),badge=element('span',g.name,'badge');badge.style.background=rgb(g.light);observation.append(badge);}   // F4
   if(s) observation.append(element('p',`${formatTime(s.data_time)} 기준`),element('p',s.period || '평균 시간 정보 없음'),element('p',Number.isFinite(s.distance_km)?`선택한 곳에서 ${s.distance_km.toFixed(1)}km`:''));
@@ -60,7 +62,9 @@ export function renderEvidence(host,data,options={}) {
   columns.append(estimate,observation);
   if(data.camera) {
     const c=data.camera,section=element('section',null,'evidence-section evidence-camera');
-    section.append(element('h3','가까운 CCTV · 추정의 근거'),element('h4',`${c.name}${Number.isFinite(c.distance_km)?' · '+c.distance_km.toFixed(1)+'km':''}`),cameraFigure(c,options));
+    section.append(element('h3','가까운 CCTV · 추정의 근거'));
+    if(c.nearest)section.append(element('p',nearestMessage(c,'camera'),'nearest-note'));
+    section.append(element('h4',`${c.name}${Number.isFinite(c.distance_km)?' · '+c.distance_km.toFixed(1)+'km':''}`),cameraFigure(c,options));
     section.append(element('p',`${formatTime(c.captured_at)} 촬영`),element('p',`사진의 추정값: ${validValue(c.pm25)?concentration(c.pm25):c.status || '추정 안 함'}`,'camera-result'));
     if(e?.source==='station') section.append(element('p','이 사진은 마지막 낮 촬영본일 수 있습니다. 밤·결측 시 지도는 측정소 실측 기반입니다.'));
     section.append(element('p','가까운 한 카메라의 값이며, 여러 카메라를 보간한 지도 농도와 다를 수 있습니다.'));
