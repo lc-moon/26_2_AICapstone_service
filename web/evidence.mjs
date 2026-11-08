@@ -43,7 +43,7 @@ export function renderEvidence(host,data,options={}) {
   estimate.append(element('div',concentration(e?.pm25),'value'));
   if(validValue(e?.pm25)) {
     const g=gradeOf(e.pm25),badge=element('span',g.name,'badge');badge.style.background=rgb(g.light);estimate.append(badge);
-    const advice=adviceFor(e.pm25);if(advice)estimate.append(element('p',`행동 요령(참고): ${advice}`,'advice'));   // F27
+    const advice=adviceFor(e.pm25);if(advice){const a=element('p',`행동 요령(참고): ${advice}`,'advice');a.title='민감군: 어린이·노인·호흡기·심혈관 질환자·임산부. 마스크를 쓰고 숨쉬기 불편하면 벗고 쉬세요. 하루 평균 예보 기준 문구입니다';estimate.append(a);}   // F27
   }
   estimate.append(element('p',e?.source==='station'?'측정소 실측 기반 보간':'CCTV 추정값 기반 공간 보간'),element('p',`${formatTime(e?.slot)} 기준`));
   if(e?.source==='cctv'){   // F21: 지도 값은 여러 사진을 보간한 것이라 같은 오차가 아니다 — "사진 한 장 기준"을 꼭 붙인다

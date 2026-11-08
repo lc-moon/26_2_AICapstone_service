@@ -14,5 +14,5 @@ test('time uses Seoul even with UTC input',()=>{assert.match(formatTime('2026-10
 test('F27 advice follows grade boundaries and stays empty for missing values',async()=>{
  const {adviceFor}=await import('./core.mjs');
  assert.match(adviceFor(15),/제약 없음/);assert.equal(adviceFor(null),'');
- assert.match(adviceFor(16),/민감군/);assert.match(adviceFor(36),/실외 활동 제한/);assert.match(adviceFor(76),/실내 활동/);
+ assert.match(adviceFor(16),/민감군/);assert.match(adviceFor(36),/KF80/);assert.match(adviceFor(76),/KF94/);
 });
