@@ -295,21 +295,22 @@ LATEST = " ORDER BY COALESCE(basis_time, slot) DESC, (source = 'cctv') DESC, slo
 def map_state(conn, slot, source):
     """지도 상태 reason·cctv(NEXT.md F13). 조회할 때 계산한다 — frames에 칸을 더하지 않음"""
     if source == "station" and not is_day(slot):
-        return "night", None
+        return "night", None, []
     rows = conn.execute(   # 카메라마다 한 줄(그 회차 행이 없으면 값·상태가 NULL). 지도 계산(rebuild_frame)과 같이 103번도 센다
-        """SELECT e.pm25_est, e.status FROM cameras c
+        """SELECT e.pm25_est, e.status, c.camera_id FROM cameras c
            LEFT JOIN estimates e ON e.camera_id = c.camera_id AND e.slot = %s""",
         (slot,),
     ).fetchall()
-    cctv = {"valid": sum(pm is not None for pm, _ in rows), "total": len(rows)}
+    cctv = {"valid": sum(pm is not None for pm, _, _ in rows), "total": len(rows)}
+    with_value = sorted(cam for pm, _, cam in rows if pm is not None)   # 첫 화면 카메라 점: 값이 없는 카메라는 흐리게
     if source == "cctv":
-        return "normal", cctv
+        return "normal", cctv, with_value
     if cctv["valid"]:
-        return "few_cameras", cctv
-    rain = sum((st or "").startswith("비") for _, st in rows)
-    humidity = sum((st or "").startswith("습도 95% 이상") for _, st in rows)
+        return "few_cameras", cctv, with_value
+    rain = sum((st or "").startswith("비") for _, st, _ in rows)
+    humidity = sum((st or "").startswith("습도 95% 이상") for _, st, _ in rows)
     counts = [(rain, "rain"), (humidity, "humidity"), (len(rows) - rain - humidity, "no_data")]
-    return max(counts, key=lambda c: c[0])[1], cctv   # max는 같은 수면 앞의 것: rain > humidity > no_data
+    return max(counts, key=lambda c: c[0])[1], cctv, with_value   # max는 같은 수면 앞의 것: rain > humidity > no_data
 
 
 @app.get("/api/frames/latest")
@@ -322,7 +323,7 @@ def frames_latest(source: Source = None):
         if not f:
             raise HTTPException(404, "아직 프레임이 없습니다")
         slot, source, basis, n, values, updated = f
-        reason, cctv = map_state(conn, slot, source)
+        reason, cctv, camera_ids = map_state(conn, slot, source)
     return {
         "slot": iso(slot),
         "source": source,
@@ -333,6 +334,7 @@ def frames_latest(source: Source = None):
         "updated_at": iso(updated),
         "reason": reason,
         "cctv": cctv,
+        "camera_ids": camera_ids,
     }
 
 

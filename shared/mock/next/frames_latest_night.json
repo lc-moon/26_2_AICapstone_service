@@ -463,5 +463,6 @@
  ],
  "updated_at": "2026-10-16T21:25:00+09:00",
  "reason": "night",
- "cctv": null
+ "cctv": null,
+ "camera_ids": []
 }

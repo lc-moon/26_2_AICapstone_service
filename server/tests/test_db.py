@@ -480,6 +480,13 @@ def test_state_normal_keys_match_next(client, db):
     assert client.get("/api/frames/latest").json().keys() == mock("next/frames_latest.json").keys()
 
 
+def test_camera_ids_lists_only_cameras_with_a_value(client, db):
+    rows = screen_rows(db, (17, "정상", 10.0), (2, RAIN, None))
+    post(client, rows)
+    f = client.get("/api/frames/latest").json()
+    assert f["camera_ids"] == sorted(r["camera_id"] for r in rows if r["pm25_est"] is not None) and len(f["camera_ids"]) == 17
+
+
 def test_state_night_is_null(client, db, monkeypatch):
     night_after_cctv(client, db, monkeypatch)
     f = client.get("/api/frames/latest").json()
