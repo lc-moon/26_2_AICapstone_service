@@ -68,6 +68,7 @@ async function refresh(){
 }
 function text(tag,content,cls){const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el;}
 function displayPoint(data){
+ $('panel').classList.toggle('no-camera',!data.camera);
  renderEvidence($('details'),data,{mock,base,placeName:selectionName});
  showEvidencePins(map,selection,data);
  if(expo&&data.estimate?.source!=='cctv')$('details').prepend(text('p','전시용 CCTV 상세 미지원 · 응답에 표시된 기준 시각과 출처를 확인해 주세요.','expo-note'));
