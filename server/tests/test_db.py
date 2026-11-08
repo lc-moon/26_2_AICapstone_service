@@ -128,6 +128,37 @@ def test_point_matches_mock(client, db):
     assert got["inside"] and got["gu"] == want["gu"] and got["grid_id"] == want["grid_id"]
     assert got["estimate"] == want["estimate"]
     assert got["station"] == want["station"]   # 가장 가까운 측정소, 가장 최근 시각, 거리 1.43 → 1.4
+    # camera: mock은 모양 예시(10042, 실제 거리 2.88km). 규칙대로면 가장 가까운 113(2.43km)
+    assert got.keys() == want.keys() and got["camera"].keys() == want["camera"].keys()
+    assert got["camera"] == {"camera_id": "113", "name": "송도1교사거리", "distance_km": 2.4,
+                             "slot": "2026-10-16T13:20:00+09:00", "captured_at": "2026-10-16T13:20:14+09:00",
+                             "pm25": 9.2, "status": "정상", "photo_url": "/cam/113.jpg?v=20261016132014"}
+
+
+def test_point_camera_latest_row_and_null(client, db):
+    rows = mock("ingest_estimates.json")["rows"]
+    r113 = next(r for r in rows if r["camera_id"] == "113")
+    assert client.get("/api/point", params=SONGDO).json()["camera"] is None   # 그 카메라 행이 하나도 없음
+    post(client, [{**r113, "slot": "2026-10-16T13:00:00+09:00", "captured_at": "2026-10-16T13:00:09+09:00", "pm25_est": 30.0}])
+    post(client, [{**r113, "slot": "2026-10-16T13:40:00+09:00", "captured_at": None, "pm25_est": None, "status": "습도 결측"}])
+    c = client.get("/api/point", params=SONGDO).json()["camera"]
+    # 가장 최근 회차(13:40) — 결측이어도 그 줄. captured_at이 없으면 ?v=는 회차 시각
+    assert (c["slot"], c["captured_at"], c["pm25"], c["status"], c["photo_url"]) == \
+           ("2026-10-16T13:40:00+09:00", None, None, "습도 결측", "/cam/113.jpg?v=20261016134000")
+    # 다른 카메라 행만 있어도 가장 가까운 카메라 기준 (메우지 않음)
+    db.execute("DELETE FROM estimates WHERE camera_id = '113'")
+    post(client, [r for r in rows if r["camera_id"] == "10042"])
+    assert client.get("/api/point", params=SONGDO).json()["camera"] is None
+
+
+def test_point_camera_excludes_out_of_area(client, db):
+    # 103번(강화, grid_id 없음) 바로 옆이 범위 안이어도 103은 고르지 않는다. 범위 밖이면 inside:false만
+    post(client, mock("ingest_estimates.json")["rows"])
+    near103 = {"lon": 126.532778, "lat": 37.627553}
+    got = client.get("/api/point", params=near103).json()
+    assert got == {"inside": False} or got["camera"]["camera_id"] != "103"
+    db.execute("UPDATE cameras SET lon = 126.6395, lat = 37.3935 WHERE camera_id = '103'")   # 103을 송도로 옮겨도
+    assert client.get("/api/point", params=SONGDO).json()["camera"]["camera_id"] == "113"
 
 
 def test_point_station_skips_non_compare(client, db):
