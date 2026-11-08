@@ -1,6 +1,8 @@
 """실제 PostgreSQL 테스트. TEST_DATABASE_URL이 없으면 건너뛴다."""
 from collections import defaultdict
 
+import pytest
+
 from conftest import AUTH, mock
 from init_db import init
 
@@ -123,16 +125,17 @@ def station_at(client, params=SONGDO):
 def test_point_matches_mock(client, db):
     post(client, mock("ingest_estimates.json")["rows"])
     obs(db, ("아암", "2026-10-16T13:00+09", 11), ("아암", "2026-10-16T12:00+09", 30))
-    want = mock("point_inside.json")
+    want = mock("next/point_inside.json")
     got = client.get("/api/point", params=SONGDO).json()
     assert got["inside"] and got["gu"] == want["gu"] and got["grid_id"] == want["grid_id"]
     assert got["estimate"] == want["estimate"]
-    assert got["station"] == want["station"]   # 가장 가까운 측정소, 가장 최근 시각, 거리 1.43 → 1.4
+    assert got["station"] == want["station"]   # 가장 가까운 측정소, 가장 최근 시각, 거리 1.43 → 1.4, nearest null
     # camera: mock은 모양 예시(10042, 실제 거리 2.88km). 규칙대로면 가장 가까운 113(2.43km)
     assert got.keys() == want.keys() and got["camera"].keys() == want["camera"].keys()
     assert got["camera"] == {"camera_id": "113", "name": "송도1교사거리", "distance_km": 2.4,
                              "slot": "2026-10-16T13:20:00+09:00", "captured_at": "2026-10-16T13:20:14+09:00",
-                             "pm25": 9.2, "status": "정상", "photo_url": "/cam/113.jpg?v=20261016132014"}
+                             "pm25": 9.2, "status": "정상", "photo_url": "/cam/113.jpg?v=20261016132014",
+                             "lon": 126.666945, "lat": 37.392985, "nearest": None}
 
 
 def test_point_camera_latest_row_and_null(client, db):
@@ -168,22 +171,34 @@ def test_point_station_skips_non_compare(client, db):
     assert (s["name"], s["distance_km"], s["pm25"]) == ("송도", 1.8, 14)
 
 
-def test_point_station_null_not_filled(client, db):
-    # 아암의 가장 최근(13시)이 결측이면 null. 12시 아암 값이나 13시 송도 값으로 메우지 않는다
+def flagged(db, name, t, flag):
+    db.execute("UPDATE observations SET pm25_flag = %s WHERE station_name = %s AND data_time = %s", (flag, name, t))
+
+
+def test_point_station_null_goes_to_next_same_time(client, db):
+    # 아암의 13시가 결측이면 같은 13시에 값이 있는 송도로. 12시 아암 값으로 메우지 않는다(F14)
     obs(db, ("아암", "2026-10-16T12:00+09", 30), ("아암", "2026-10-16T13:00+09", None), ("송도", "2026-10-16T13:00+09", 14))
-    assert station_at(client) == {"name": "아암", "distance_km": 1.4, "pm25": None,
-                                  "data_time": "2026-10-16T13:00:00+09:00", "period": "12~13시 평균"}
+    assert station_at(client) == {"name": "송도", "distance_km": 1.8, "pm25": 14,
+                                  "data_time": "2026-10-16T13:00:00+09:00", "period": "12~13시 평균",
+                                  "lon": 126.654663, "lat": 37.382084,
+                                  "nearest": {"name": "아암", "distance_km": 1.4, "reason": None,
+                                              "lon": 126.63227, "lat": 37.40508}}
 
 
-def test_point_station_own_latest_time(client, db):
-    # 측정소마다 마지막 시각이 다르면 가까운 측정소 자신의 마지막 시각. 더 최근인 송도 14시를 쓰지 않는다
+def test_point_station_reference_time_is_latest_compare_value(client, db):
+    # 아암 마지막이 12시, 송도가 14시면 기준 시각 14시 → 송도. 행이 없는 아암은 reason null
     obs(db, ("아암", "2026-10-16T11:00+09", 20), ("아암", "2026-10-16T12:00+09", 30), ("송도", "2026-10-16T14:00+09", 14))
     s = station_at(client)
-    assert (s["name"], s["pm25"], s["data_time"], s["period"]) == ("아암", 30, "2026-10-16T12:00:00+09:00", "11~12시 평균")
+    assert (s["name"], s["pm25"], s["data_time"], s["period"], s["nearest"]["name"], s["nearest"]["reason"]) == \
+           ("송도", 14, "2026-10-16T14:00:00+09:00", "13~14시 평균", "아암", None)
+    # 비교용이 아닌 측정소(운서)의 더 최근 값은 기준 시각이 되지 않는다
+    obs(db, ("운서", "2026-10-16T15:00+09", 5))
+    assert station_at(client)["data_time"] == "2026-10-16T14:00:00+09:00"
 
 
 def test_point_station_no_observations(client, db):
-    assert station_at(client) == {"name": "아암", "distance_km": 1.4, "pm25": None, "data_time": None, "period": None}
+    assert station_at(client) == {"name": "아암", "distance_km": 1.4, "pm25": None, "data_time": None, "period": None,
+                                  "lon": 126.63227, "lat": 37.40508, "nearest": None}
 
 
 def test_point_station_kst_and_midnight(client, db):
@@ -265,7 +280,7 @@ def test_night_station_frame_matches_mock_shape(client, db, monkeypatch):
     obs(db, *NIGHT_OBS)
     at(monkeypatch, 2026, 10, 16, 21, 50)
     assert app.night_frame() == 2
-    got, want = client.get("/api/frames/latest").json(), mock("frames_latest_night.json")
+    got, want = client.get("/api/frames/latest").json(), mock("next/frames_latest_night.json")
     assert got.keys() == want.keys()
     assert (got["slot"], got["source"], got["basis_time"], got["n_inputs"]) == \
            ("2026-10-16T21:00:00+09:00", "station", "2026-10-16T21:00:00+09:00", 2)
@@ -440,3 +455,113 @@ def test_latest_tie_prefers_cctv(client, db):
     obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9))
     post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])         # 13:20 빈 회차 → 자료 시각 13:00 (동점)
     assert latest(client) == ("2026-10-16T13:00:00+09:00", "cctv", None)
+
+
+# ── F13: /api/frames/latest의 reason·cctv ──────────────────────
+
+RAIN, HUMID, WX_MISSING = "비(60분 강수량) — 추정 안 함", "습도 95% 이상 — 추정 안 함", "습도 결측"
+
+
+def screen_rows(db, *groups):
+    """화면 범위 카메라 19대의 13:20 행. groups = (대수, status, pm25). 대수를 다 못 채운 카메라는 행을 만들지 않음"""
+    base = mock("ingest_estimates.json")["rows"][0]
+    ids = iter(r[0] for r in db.execute("SELECT camera_id FROM cameras WHERE grid_id IS NOT NULL ORDER BY camera_id"))
+    return [{**base, "camera_id": next(ids), "status": st, "pm25_est": pm} for n, st, pm in groups for _ in range(n)]
+
+
+def state_of(client):
+    f = client.get("/api/frames/latest").json()
+    return f["source"], f["reason"], f["cctv"]
+
+
+def test_state_normal_keys_match_next(client, db):
+    post(client, screen_rows(db, (19, "정상", 10.0)))
+    assert state_of(client) == ("cctv", "normal", {"valid": 19, "total": 19})
+    assert client.get("/api/frames/latest").json().keys() == mock("next/frames_latest.json").keys()
+
+
+def test_state_night_is_null(client, db, monkeypatch):
+    night_after_cctv(client, db, monkeypatch)
+    f = client.get("/api/frames/latest").json()
+    assert (f["source"], f["reason"], f["cctv"]) == ("station", "night", None)
+    assert f.keys() == mock("next/frames_latest_night.json").keys()
+    # ?source=cctv는 같은 필드, 항상 normal. 103번은 세지 않고 124번은 이 회차에 없어 18/19
+    c = client.get("/api/frames/latest", params={"source": "cctv"}).json()
+    assert (c["source"], c["reason"], c["cctv"]) == ("cctv", "normal", {"valid": 18, "total": 19})
+
+
+@pytest.mark.parametrize("groups, reason, valid, example", [
+    ([(19, RAIN, None)], "rain", 0, "frames_latest_rain.json"),
+    ([(19, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
+    ([(19, WX_MISSING, None)], "no_data", 0, "frames_latest_rain.json"),
+    ([(19, "사진 읽기 실패", None)], "no_data", 0, "frames_latest_rain.json"),
+    ([(9, "정상", 10.0), (10, RAIN, None)], "few_cameras", 9, "frames_latest_few.json"),
+    ([(1, "정상", 10.0)], "few_cameras", 1, "frames_latest_few.json"),       # 나머지 18대는 행이 없음
+    ([(10, RAIN, None), (9, HUMID, None)], "rain", 0, "frames_latest_rain.json"),
+    ([(5, RAIN, None), (14, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
+    ([(7, RAIN, None), (7, HUMID, None), (5, WX_MISSING, None)], "rain", 0, "frames_latest_rain.json"),     # 같은 수: rain > humidity
+    ([(5, RAIN, None), (7, HUMID, None), (7, WX_MISSING, None)], "humidity", 0, "frames_latest_rain.json"),  # 같은 수: humidity > no_data
+    ([(5, RAIN, None), (5, HUMID, None)], "no_data", 0, "frames_latest_rain.json"),                         # 행이 없는 9대는 no_data
+])
+def test_state_day_station(client, db, groups, reason, valid, example):
+    obs(db, ("아암", "2026-10-16T13:00+09", 11))
+    post(client, screen_rows(db, *groups))
+    assert state_of(client) == ("station", reason, {"valid": valid, "total": 19})
+    assert client.get("/api/frames/latest").json().keys() == mock("next/" + example).keys()
+
+
+# ── F14: 근거 패널을 지도와 같은 재료로 + 건너뛴 이유 ────────────
+
+def rows_without(*cameras):
+    return [r for r in mock("ingest_estimates.json")["rows"] if r["camera_id"] not in cameras]
+
+
+def r113(**kw):
+    return {**next(r for r in mock("ingest_estimates.json")["rows"] if r["camera_id"] == "113"), **kw}
+
+
+def point_at(client, **kw):
+    return client.get("/api/point", params={**SONGDO, **kw}).json()
+
+
+def test_fallback_matches_next_example(client, db):
+    # 가장 가까운 113은 이 회차 행 없음(12:20이 마지막 값) → 10042 + no_feed + since 12:40. 아암은 빈 값 + 통신장애 → 송도
+    post(client, [r113(slot="2026-10-16T12:20:00+09:00", captured_at="2026-10-16T12:20:14+09:00")])
+    post(client, rows_without("113"))
+    obs(db, ("아암", "2026-10-16T13:00+09", None), ("송도", "2026-10-16T13:00+09", 9))
+    flagged(db, "아암", "2026-10-16T13:00+09", "통신장애")
+    got, want = point_at(client), mock("next/point_fallback.json")
+    assert got["camera"] == want["camera"] and got["station"] == want["station"]
+    assert got.keys() == want.keys()
+
+
+@pytest.mark.parametrize("status, reason", [
+    (RAIN, "rain"), (HUMID, "humidity"), (WX_MISSING, "weather_missing"), ("사진 읽기 실패", "photo_error"),
+])
+def test_nearest_camera_skip_reason(client, db, status, reason):
+    post(client, [*rows_without("113"), r113(pm25_est=None, status=status)])
+    c = point_at(client)["camera"]
+    assert (c["camera_id"], c["nearest"]["camera_id"], c["nearest"]["reason"]) == ("10042", "113", reason)
+    assert c["nearest"]["since"] is None   # 그날 값을 낸 적 없음
+
+
+def test_since_only_counts_same_day(client, db):
+    post(client, [r113(slot="2026-10-15T23:40:00+09:00", captured_at="2026-10-15T23:40:14+09:00")])   # 전날 값
+    post(client, rows_without("113"))
+    assert point_at(client)["camera"]["nearest"]["since"] is None
+
+
+def test_station_map_keeps_nearest_camera_latest_row(client, db, monkeypatch):
+    # 밤 측정소 지도: 건너뛰지 않고 가장 가까운 113의 가장 최근 행
+    post(client, [r113(slot="2026-10-16T12:20:00+09:00", captured_at="2026-10-16T12:20:14+09:00")])
+    post(client, rows_without("113"))
+    import app
+    obs(db, *NIGHT_OBS)
+    at(monkeypatch, 2026, 10, 16, 21, 50)
+    assert app.night_frame() == 2
+    p = point_at(client)
+    assert (p["estimate"]["source"], p["camera"]["camera_id"], p["camera"]["slot"], p["camera"]["nearest"]) == \
+           ("station", "113", "2026-10-16T12:20:00+09:00", None)
+    # ?source=cctv면 그 CCTV 지도 기준으로 건너뜀
+    c = point_at(client, source="cctv")["camera"]
+    assert (c["camera_id"], c["slot"], c["nearest"]["reason"]) == ("10042", "2026-10-16T13:20:00+09:00", "no_feed")
