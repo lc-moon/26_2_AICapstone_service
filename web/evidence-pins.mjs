@@ -7,6 +7,7 @@
 import {gradeOf,validValue,rgb,formatTime} from './core.mjs';
 import {cameraFigure,element} from './evidence.mjs';
 let targets=[],overlay=null,raf=0,mapRef=null,saved=null,active=null,ctx={},dimmed=false,measuring=false;
+const baseOpacity=new Map();
 const empty={type:'FeatureCollection',features:[]};
 const ICON={
  station:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 17c2-3 4-3 6 0s4 3 6 0 3-2 4-1"/><path d="M4 10c2-3 4-3 6 0s4 3 6 0 3-2 4-1"/></svg>',
@@ -51,11 +52,11 @@ export function initEvidencePins(map,options){
 // 선택 중에는 지도의 장소 아이콘·글자를 흐리게(근거 핀이 묻히지 않게)
 function dim(on){
   if(!mapRef||dimmed===on)return;dimmed=on;
-  for(const l of mapRef.getStyle().layers)if(l.type==='symbol'&&/^poi/.test(l.id)){mapRef.setPaintProperty(l.id,'icon-opacity',on?.25:1);mapRef.setPaintProperty(l.id,'text-opacity',on?.3:1);}
+  for(const l of mapRef.getStyle().layers)if(l.type==='symbol'&&/^poi/.test(l.id)){for(const [property,opacity] of [['icon-opacity',.25],['text-opacity',.3]]){const key=l.id+property;if(on)baseOpacity.set(key,mapRef.getPaintProperty(l.id,property)??1);mapRef.setPaintProperty(l.id,property,on?opacity:baseOpacity.get(key)??1);}}
 }
 
 export function clearEvidencePins(){
-  targets.forEach(t=>{t.marker.remove();t.edge?.remove();});targets=[];active=null;saved=null;dim(false);
+  targets.forEach(t=>{t.marker.remove();t.edge?.remove();t.box?.remove();});targets=[];active=null;saved=null;dim(false);
   overlay?.replaceChildren();mapRef?.getSource('ev-link')?.setData(empty);
 }
 
@@ -157,7 +158,7 @@ function boxFree(b,W,H,B){
   const xs=[b.l,b.l+W/2,b.l+W],ys=[b.t,b.t+H/2,b.t+H];
   return xs.every(x=>ys.every(y=>free(x,y,B,10)));
 }
-function boxSize(t){const box=t.el.querySelector('.ev-detail');return {W:box?.offsetWidth||228,H:box?.offsetHeight||(t.type==='cctv'?260:140)};}
+function boxSize(t){const box=t.box;return {W:box?.offsetWidth||228,H:box?.offsetHeight||(t.type==='cctv'?260:140)};}
 
 // 선택한 곳을 화면의 같은 자리에 둔 채, 목표와 상세 상자가 다 보이는 가장 큰 줌을 찾는다
 function anchoredView(t){
@@ -174,20 +175,30 @@ function anchoredView(t){
 }
 
 function placeDetail(t){
-  const box=t.el.querySelector('.ev-detail');if(!box)return;
-  const B=blockers(),{W,H}=boxSize(t),q=mapRef.project(t.at),list=spots(q,W,H),b=list.find(x=>boxFree(x,W,H,B))||list[0];
-  Object.assign(box.style,{left:(b.l-q.x)+'px',top:(b.t-q.y)+'px',bottom:'auto',transform:'none'});
+  const box=t.box;if(!box)return;
+  const B=blockers(),{W,H}=boxSize(t),q=mapRef.project(t.at),c=mapRef.getContainer();
+  let b=spots(q,W,H).find(x=>boxFree(x,W,H,B));
+  if(!b){
+    // When the phone cannot fit a full popup, use a scrollable box in free map space.
+    for(let y=12;y<c.clientHeight-90&&!b;y+=16)for(let x=12;x<=c.clientWidth-W-12;x+=16){
+      if(boxFree({l:x,t:y},W,Math.min(H,100),B)){b={l:x,t:y};break;}
+    }
+  }
+  b??={l:Math.max(12,c.clientWidth-W-12),t:12};
+  const below=B.filter(r=>r.t>b.t&&r.l<b.l+W&&r.r>b.l).map(r=>r.t-8);
+  const bottom=Math.min(c.clientHeight-12,...below);
+  Object.assign(box.style,{left:b.l+'px',top:b.t+'px',bottom:'auto',transform:'none',maxHeight:Math.max(80,bottom-b.t)+'px',overflow:'auto',pointerEvents:'auto'});
 }
 
 function toggle(t){
   const map=mapRef;
   if(active===t){ // 원래 시점으로
-    active=null;t.el.classList.remove('on');t.el.querySelector('.ev-detail')?.remove();links();
+    active=null;t.el.classList.remove('on');t.box?.remove();t.box=null;links();
     if(saved)map.easeTo({...saved,duration:900,essential:true});saved=null;return;
   }
-  if(active){active.el.classList.remove('on');active.el.querySelector('.ev-detail')?.remove();}
+  if(active){active.el.classList.remove('on');active.box?.remove();active.box=null;}
   if(!saved)saved={center:map.getCenter(),zoom:map.getZoom()};
-  active=t;t.el.classList.add('on');t.el.append(detail(t));links();
+  active=t;t.el.classList.add('on');t.box=detail(t);overlay.append(t.box);links();
   const view=anchoredView(t);
   if(view&&(Math.abs(view.zoom-map.getZoom())>.01))map.easeTo({center:view.center,zoom:view.zoom,duration:1000,essential:true});
   map.once('idle',()=>placeDetail(t));placeDetail(t);
