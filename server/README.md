@@ -134,7 +134,7 @@ python airkorea.py      # 결과 요약 출력. 실제 API를 1회(인천·경�
 | 저장소 | `/srv/incheon-air` (`main`) | `.env`는 서버에만(권한 600). DB 비밀번호·수신 토큰은 서버에서 만들어 넣음 |
 | PostgreSQL 16 | DB `pm_map`, 사용자 `pm_map` | localhost만. 메모리 작게(`/etc/postgresql/16/main/conf.d/small.conf`) |
 | API | `incheon-air-api.service` → `127.0.0.1:8001` | uvicorn 1개, `MemoryMax=550M`(11/8 직접 해보기 연결 때 200M에서 올림), 재부팅 시 자동 시작 |
-| Caddy | `/etc/caddy/Caddyfile` | HTTPS 자동. `/api/*`는 API로, `/web/`과 `/shared/boundary.geojson`만 파일로, 나머지는 `/web/`으로 돌림 |
+| Caddy | `/etc/caddy/Caddyfile` | HTTPS 자동. `/api/*`는 API로, `/web/`·`/cam/`(가린 사진)·`/shared/boundary.geojson`만 파일로, 나머지는 `/web/`으로 돌림 |
 | 추정기 → API | 수집기 저장소 `.env`의 `SERVICE_API_URL=http://127.0.0.1:8001` | 같은 서버라 인터넷을 거치지 않음 |
 | 방화벽 | GCP `allow-web`(tcp 80·443, 태그 `web`) | DB·API 포트는 밖에서 안 열림 |
 
