@@ -19,6 +19,7 @@ pip install -r requirements.txt
 | `INGEST_TOKEN` | 추정기가 `Authorization: Bearer …`로 보낼 토큰. 비어 있으면 수신을 전부 거절 |
 | `AIRKOREA_API_KEY` | 에어코리아 일반 인증키(Encoding·Decoding 둘 다 됨). 비어 있으면 매시 수집을 켜지 않음(나머지 API는 정상) |
 | `INFER_CMD` | 직접 해보기 명령(팀장이 만든 `infer_now.py`). 뒤에 카메라 번호를 붙여 실행. 비어 있으면 `POST /api/infer`가 503. 로컬 개발은 `python tests/fake_infer.py`(`shared/mock/infer_ok.json`을 그대로 출력하는 가짜, 실제 추정 아님) |
+| `KAKAO_REST_KEY` | 장소 검색용 카카오 REST API 키(서버에만 둠). 비어 있으면 `GET /api/search`가 503 |
 
 **PostgreSQL 준비** — DB만 만들면 테이블은 다음 단계가 만듭니다.
 
@@ -67,6 +68,7 @@ TEST_DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/pm_map_test 
 | `GET /api/grid` | `shared/mock/grid.json`과 같은 모양. `boundary`는 `shared/boundary.geojson`의 `area` |
 | `GET /api/frames/latest` | 가장 최근 지도 = **자료 시각**(측정소 지도는 `basis_time`, CCTV 지도는 회차 시각)이 가장 늦은 것, 같으면 CCTV(11/8). `/api/point`도 같은 지도를 쓴다. 프레임이 하나도 없으면 404. **전시용 `?source=cctv`**: 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차), CCTV 프레임이 없으면 404. `cctv` 말고 다른 값은 422. 지도 상태 `reason`(normal/night/rain/humidity/few_cameras/no_data)과 `cctv`(`{valid, total}`, 화면 범위 19대 기준, 밤이면 `null`)를 조회할 때 계산해 같이 준다 |
 | `GET /api/point?lon=&lat=` | `&source=cctv`면 `estimate`만 가장 최근 CCTV 프레임에서(없으면 `estimate: null`), `camera`도 그 지도 기준. 범위 밖(`boundary.geojson`의 `area` 밖)이면 `{"inside": false}`. 안이면 그 칸의 최신 프레임 값·등급·회차·가장 가까운 CCTV 거리. 프레임이 없으면 `estimate: null`. `station` = 비교용(`use_for_compare`) 측정소에 값이 있는 가장 최근 시각에, 값이 있는 곳 중 가장 가까운 측정소(다른 시각 값으로 메우지 않음). 가장 가까운 곳을 건너뛰면 `nearest`에 그 곳과 `reason`(`pm25_flag` 그대로, 없으면 `null`). 측정값이 하나도 없으면 `pm25`·`data_time`·`period`가 `null`. `camera` = 화면 범위 카메라(`grid_id` 있음, 103번 제외) 중 CCTV 지도면 그 지도에 값을 낸 가장 가까운 곳의 그 회차 행, 측정소 지도면 가장 가까운 곳의 가장 최근 행과 `photo_url`(`/cam/{id}.jpg?v=촬영 시각 숫자`, `captured_at`이 없으면 회차 시각). CCTV 지도에서 가장 가까운 곳을 건너뛰면 `nearest`에 그 곳과 `reason`(`no_feed`·`rain`·`humidity`·`weather_missing`·`photo_error`), `since`(그날 마지막 값의 20분 뒤, 없으면 `null`). 행이 없으면 `camera: null`. `camera`·`station`에 `lon`·`lat` 포함 |
+| `GET /api/search?q=` | 장소 검색(카카오 로컬). 주소 검색 → 결과 없으면 키워드 검색. 응답 `{query, status, results: [{name, address, lon, lat, inside}]}`, 최대 5개. `status`: `ok`(범위 안만) / `empty` / `outside_incheon`(`results: []`) / `outside_area`(인천이지만 전부 범위 밖, 인천 결과를 줌). `q`는 1~100자·공백만 불가(아니면 422). 키 없음·카카오 오류·5초 초과는 503. 결과를 저장하지 않고 로그에 검색어를 남기지 않음 |
 | `POST /api/infer?camera_id=` | 직접 해보기. `cameras`에 없는 번호는 404(명령에 넘기기 전에 확인, 셸 안 씀). `INFER_CMD` + 번호를 별도 스레드에서 실행(그동안 다른 API는 바로 응답). 한 번에 하나(진행 중 409), 명령 종료 코드 75(정기 추정기가 도는 중)도 409. 같은 카메라 60초 안 재요청은 명령을 다시 돌리지 않고 `cached: true`. 30초 초과·실패·출력이 약속과 다르면 503(밤에 사진 없이 `captured_at`·`pm25`가 둘 다 `null`인 사유 응답은 200). 응답 = 명령 출력 + `name`·`grade`·`cached`·`elapsed_s`. DB에 넣지 않음 |
 | `GET /api/health` | `last_slot`, `last_received_at`, `stale`. stale = 낮에 40분 넘게 추정값이 안 옴(밤과 해 뜬 직후 40분은 false). 낮·밤은 `sun.py`(수집기와 같은 식) |
 

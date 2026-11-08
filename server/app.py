@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Annotated, Literal, Optional
 
+import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
@@ -25,6 +26,19 @@ from sun import is_day
 
 KST = timezone(timedelta(hours=9))
 log = logging.getLogger("uvicorn.error")
+
+
+class HideSearchQuery(logging.Filter):
+    """uvicorn 접근 로그의 /api/search 줄에서 ?q= 를 뺀다(NEXT.md F2: 로그에 검색어를 남기지 않음)"""
+    def filter(self, record):
+        a = record.args
+        if isinstance(a, tuple) and len(a) >= 3 and str(a[2]).startswith("/api/search"):
+            record.args = (*a[:2], "/api/search", *a[3:])
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(HideSearchQuery())
+logging.getLogger("httpx").setLevel(logging.WARNING)   # httpx는 INFO로 요청 주소(검색어 포함)를 찍는다
 METHOD = "idw 1/(d²+0.05)"
 MIN_CCTV = 10   # 유효 CCTV 값이 이보다 적으면 CCTV 지도를 만들지 않고 빈 회차처럼 측정소로(입력 1대면 IDW가 인천 전체를 한 값으로 칠함). 측정값이 아니라 출발점으로 정한 기준(11/8)
 STALE_AFTER = timedelta(minutes=40)   # 낮에 2회차(40분) 동안 추정값이 하나도 안 오면 stale
@@ -416,6 +430,47 @@ def nearest_station(conn, lon, lat):
                    "lon": x0, "lat": y0}
     return {"name": name, "distance_km": round(d, 1), "pm25": None if pm is None else round(pm, 1),
             "data_time": iso(t), "period": period(t) if t else None, "lon": x, "lat": y, "nearest": nearest}
+
+
+def kakao_client():
+    return httpx.Client(timeout=5)   # 테스트에서 바꿔 끼운다
+
+
+def kakao_docs(client, key, kind, **params):
+    r = client.get(f"https://dapi.kakao.com/v2/local/search/{kind}.json", params=params,
+                   headers={"Authorization": f"KakaoAK {key}"})
+    r.raise_for_status()
+    return r.json()["documents"]
+
+
+def kakao_search(key, q):
+    """주소 검색(지번·도로명), 결과가 없으면 키워드 검색(장소 이름). [(이름, 주소, x, y)]"""
+    with kakao_client() as c:
+        docs = kakao_docs(c, key, "address", query=q)
+        if docs:
+            return [(d["address_name"], (d.get("road_address") or {}).get("address_name") or d["address_name"],
+                     d["x"], d["y"]) for d in docs]
+        return [(d["place_name"], d.get("road_address_name") or d["address_name"], d["x"], d["y"])
+                for d in kakao_docs(c, key, "keyword", query=q, size=5)]
+
+
+@app.get("/api/search")
+def search(q: str = Query(min_length=1, max_length=100, pattern=r"\S")):
+    """장소 검색(NEXT.md F2). 카카오 조건상 결과를 저장하지 않고, 로그에 검색어를 남기지 않는다"""
+    key = os.environ.get("KAKAO_REST_KEY", "").strip()
+    if not key:
+        raise HTTPException(503, "검색을 사용할 수 없습니다")
+    try:
+        results = [{"name": name, "address": address, "lon": float(x), "lat": float(y),
+                    "inside": inside_area(float(x), float(y))} for name, address, x, y in kakao_search(key, q)]
+    except (httpx.HTTPError, KeyError, TypeError, ValueError, AttributeError) as e:
+        # 예외 문구에는 검색어가 든 주소가 있을 수 있어 종류와 상태 코드만 남긴다
+        log.warning("카카오 검색 실패: %s %s", type(e).__name__, getattr(getattr(e, "response", None), "status_code", ""))
+        raise HTTPException(503, "검색을 사용할 수 없습니다")
+    incheon = [r for r in results if r["address"].startswith("인천")]
+    inside = [r for r in incheon if r["inside"]]
+    status = "empty" if not results else "outside_incheon" if not incheon else "ok" if inside else "outside_area"
+    return {"query": q, "status": status, "results": (inside or incheon)[:5]}
 
 
 @app.get("/api/health")
