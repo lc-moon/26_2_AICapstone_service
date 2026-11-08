@@ -72,7 +72,7 @@ async function getPoint(p){
  if(!mock)return json(`${base}${apiPath('/api/point',{expo,query:{lon:p[0],lat:p[1]}})}`,{allow404:true});
  const idx=cellAt(p,grid.cells,layout),cell=grid.cells[idx];
  // Only the supplied sample cell has a station comparison fixture. Never invent observations.
- const sample=await fixture('point_inside');
+ const sample=await fixture(scenario==='fallback'?'next/point_fallback':scenario==='legacy'?'point_inside':'next/point_inside');
  return {inside:true,gu:cell?.gu,estimate:{pm25:idx<0?null:current?.values[idx]??null,slot:current?.slot,source:current?.source},station:cell?.grid_id===sample.grid_id?sample.station:null,camera:cell?.grid_id===sample.grid_id?sample.camera:null};
 }
 async function selectPoint(p,fly=true,placeName=null){
@@ -150,7 +150,8 @@ async function start(){
    const building=layers.find(l=>l.type==='fill-extrusion')?.id;
    map.addLayer({id:'cloud',type:'raster',source:'cloud',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],10,.9,15,.5,17,.25],'raster-fade-duration':0}},building||labels);
    map.addSource('pick',{type:'geojson',data:empty});map.addLayer({id:'pick',type:'circle',source:'pick',paint:{'circle-radius':7,'circle-color':'#235954','circle-stroke-color':'#fff','circle-stroke-width':3}});
-   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(selection)showView(false);else home();mapOk=true;mapLoaded();   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다if(mock&&params.has('sample')){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}
+   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(selection)showView(false);else home();mapOk=true;mapLoaded();   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다
+   if(mock&&params.has('sample')){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}
   });
   await refresh();timer=setInterval(()=>void refresh(),60000);
  }catch(e){loadIssue=`화면을 불러올 수 없습니다. ${e.message}`;showStatus();$('retry').onclick=()=>location.reload();}
