@@ -296,9 +296,9 @@ def map_state(conn, slot, source):
     """지도 상태 reason·cctv(NEXT.md F13). 조회할 때 계산한다 — frames에 칸을 더하지 않음"""
     if source == "station" and not is_day(slot):
         return "night", None
-    rows = conn.execute(   # 화면 범위 카메라마다 한 줄(그 회차 행이 없으면 값·상태가 NULL)
+    rows = conn.execute(   # 카메라마다 한 줄(그 회차 행이 없으면 값·상태가 NULL). 지도 계산(rebuild_frame)과 같이 103번도 센다
         """SELECT e.pm25_est, e.status FROM cameras c
-           LEFT JOIN estimates e ON e.camera_id = c.camera_id AND e.slot = %s WHERE c.grid_id IS NOT NULL""",
+           LEFT JOIN estimates e ON e.camera_id = c.camera_id AND e.slot = %s""",
         (slot,),
     ).fetchall()
     cctv = {"valid": sum(pm is not None for pm, _ in rows), "total": len(rows)}
