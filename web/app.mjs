@@ -94,7 +94,15 @@ async function selectPoint(p,fly=true,placeName=null){
  }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도에서 다시 선택해 주세요.'));}
 }
 function closePanel(){disposeInference();clearEvidencePins();selection=null;selectionName=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;map?.getSource('pick')?.setData(empty);}
-function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0}});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(estimate){const p=$('panel');return matchMedia('(max-width:700px)').matches?{top:$('legend').getBoundingClientRect().bottom,left:0,right:0,bottom:(estimate?Math.max(p.offsetHeight,innerHeight*.42):p.offsetHeight)+parseFloat(getComputedStyle(p).bottom)}:{top:0,bottom:(estimate?Math.max(p.offsetHeight,innerHeight*.35):p.offsetHeight)+parseFloat(getComputedStyle(p).bottom),left:0,right:0};}function settle(){const go=()=>{if(selection)map.easeTo({padding:panelPad(false),duration:300,essential:true});};map.isMoving()?map.once('moveend',go):go();}function closeAndCenter(){const p=selection;closePanel();if(p)map.easeTo({center:p,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});}function home(){closePanel();const mobile=matchMedia('(max-width:700px)').matches,center=[126.69, 37.475],m=mobile?mobileHome():null;map.easeTo({center:m?m.center:center,zoom:m?m.zoom:fitZoom(center,{top:16,bottom:40,left:16,right:70}),pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});showView(false);}
+function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0}});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(){
+ const p=$('panel'),phone=matchMedia('(max-width:700px)').matches;
+ const visible=['title','legend','place-search'].map(id=>$(id)).filter(e=>e?.getClientRects().length);
+ const top=phone?Math.min(innerHeight*.4,Math.max(0,...visible.map(e=>e.getBoundingClientRect().bottom))+8):16;
+ const bottom=Math.max(0,Math.min(p.offsetHeight+(parseFloat(getComputedStyle(p).bottom)||0)+12,innerHeight-top-100));
+ return {top,bottom,left:0,right:0};
+}
+function settle(){const go=()=>{if(selection)map.easeTo({center:selection,padding:panelPad(),duration:300,essential:true});};map.isMoving()?map.once('moveend',go):go();}
+function closeAndCenter(){const p=selection;closePanel();if(p)map.easeTo({center:p,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});}function home(){closePanel();const mobile=matchMedia('(max-width:700px)').matches,center=[126.69, 37.475],m=mobile?mobileHome():null;map.easeTo({center:m?m.center:center,zoom:m?m.zoom:fitZoom(center,{top:16,bottom:40,left:16,right:70}),pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0},duration:motion,essential:true});showView(false);}
 function showView(flat){$('view-2d').setAttribute('aria-pressed',String(flat));$('view-3d').setAttribute('aria-pressed',String(!flat));}
 function setView(flat){map.easeTo({pitch:flat?0:40,duration:motion,essential:true});showView(flat);}
 // 휴대폰 첫 화면(F26): 구도(pitch 40, bearing -12)는 그대로, 본체가 다 들어가는 줌보다 조금(+0.25) 크게,
@@ -121,7 +129,7 @@ function mobileHome(){
   return {center:[m.lng,m.lat],zoom};
 }
 function wire(){
- document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||!mapOk)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.endsWith('/about.html')){const c=map.getCenter();try{saveView(sessionStorage,{center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),selection,name:selectionName});}catch{}}});
+ document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||!mapOk)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.endsWith('/about.html')){const c=map.getCenter();try{saveView(sessionStorage,{center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding(),selection,name:selectionName});}catch{}}});
  void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name)=>void selectPoint(p,true,name)});
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
  $('view-2d').onclick=()=>setView(true);$('view-3d').onclick=()=>setView(false);
@@ -158,7 +166,7 @@ async function start(){
    map.addLayer({id:'cloud',type:'raster',source:'cloud',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],10,.9,15,.5,17,.25],'raster-fade-duration':0}},building||labels);
    initEvidencePins(map,{mock,base});
    map.addSource('pick',{type:'geojson',data:empty});map.addLayer({id:'pick',type:'circle',source:'pick',paint:{'circle-radius':7,'circle-color':'#235954','circle-stroke-color':'#fff','circle-stroke-width':3}});
-   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();mapOk=true;mapLoaded();
+   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:restored.padding||{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();mapOk=true;mapLoaded();
    if(restored?.selection)void selectPoint(restored.selection,false,restored.name);restored=null;   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다
    if(mock&&params.has('sample')){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}
   });
