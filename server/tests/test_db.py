@@ -1,6 +1,8 @@
 """실제 PostgreSQL 테스트. TEST_DATABASE_URL이 없으면 건너뛴다."""
 from collections import defaultdict
 
+import pytest
+
 from conftest import AUTH, mock
 from init_db import init
 
@@ -265,7 +267,7 @@ def test_night_station_frame_matches_mock_shape(client, db, monkeypatch):
     obs(db, *NIGHT_OBS)
     at(monkeypatch, 2026, 10, 16, 21, 50)
     assert app.night_frame() == 2
-    got, want = client.get("/api/frames/latest").json(), mock("frames_latest_night.json")
+    got, want = client.get("/api/frames/latest").json(), mock("next/frames_latest_night.json")
     assert got.keys() == want.keys()
     assert (got["slot"], got["source"], got["basis_time"], got["n_inputs"]) == \
            ("2026-10-16T21:00:00+09:00", "station", "2026-10-16T21:00:00+09:00", 2)
@@ -440,3 +442,56 @@ def test_latest_tie_prefers_cctv(client, db):
     obs(db, ("아암", "2026-10-16T13:00+09", 11), ("송도", "2026-10-16T13:00+09", 9))
     post(client, [{**r, "pm25_est": None, "status": "비"} for r in rows])         # 13:20 빈 회차 → 자료 시각 13:00 (동점)
     assert latest(client) == ("2026-10-16T13:00:00+09:00", "cctv", None)
+
+
+# ── F13: /api/frames/latest의 reason·cctv ──────────────────────
+
+RAIN, HUMID, WX_MISSING = "비(60분 강수량) — 추정 안 함", "습도 95% 이상 — 추정 안 함", "습도 결측"
+
+
+def screen_rows(db, *groups):
+    """화면 범위 카메라 19대의 13:20 행. groups = (대수, status, pm25). 대수를 다 못 채운 카메라는 행을 만들지 않음"""
+    base = mock("ingest_estimates.json")["rows"][0]
+    ids = iter(r[0] for r in db.execute("SELECT camera_id FROM cameras WHERE grid_id IS NOT NULL ORDER BY camera_id"))
+    return [{**base, "camera_id": next(ids), "status": st, "pm25_est": pm} for n, st, pm in groups for _ in range(n)]
+
+
+def state_of(client):
+    f = client.get("/api/frames/latest").json()
+    return f["source"], f["reason"], f["cctv"]
+
+
+def test_state_normal_keys_match_next(client, db):
+    post(client, screen_rows(db, (19, "정상", 10.0)))
+    assert state_of(client) == ("cctv", "normal", {"valid": 19, "total": 19})
+    assert client.get("/api/frames/latest").json().keys() == mock("next/frames_latest.json").keys()
+
+
+def test_state_night_is_null(client, db, monkeypatch):
+    night_after_cctv(client, db, monkeypatch)
+    f = client.get("/api/frames/latest").json()
+    assert (f["source"], f["reason"], f["cctv"]) == ("station", "night", None)
+    assert f.keys() == mock("next/frames_latest_night.json").keys()
+    # ?source=cctv는 같은 필드, 항상 normal. 103번은 세지 않고 124번은 이 회차에 없어 18/19
+    c = client.get("/api/frames/latest", params={"source": "cctv"}).json()
+    assert (c["source"], c["reason"], c["cctv"]) == ("cctv", "normal", {"valid": 18, "total": 19})
+
+
+@pytest.mark.parametrize("groups, reason, valid, example", [
+    ([(19, RAIN, None)], "rain", 0, "frames_latest_rain.json"),
+    ([(19, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
+    ([(19, WX_MISSING, None)], "no_data", 0, "frames_latest_rain.json"),
+    ([(19, "사진 읽기 실패", None)], "no_data", 0, "frames_latest_rain.json"),
+    ([(9, "정상", 10.0), (10, RAIN, None)], "few_cameras", 9, "frames_latest_few.json"),
+    ([(1, "정상", 10.0)], "few_cameras", 1, "frames_latest_few.json"),       # 나머지 18대는 행이 없음
+    ([(10, RAIN, None), (9, HUMID, None)], "rain", 0, "frames_latest_rain.json"),
+    ([(5, RAIN, None), (14, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
+    ([(7, RAIN, None), (7, HUMID, None), (5, WX_MISSING, None)], "rain", 0, "frames_latest_rain.json"),     # 같은 수: rain > humidity
+    ([(5, RAIN, None), (7, HUMID, None), (7, WX_MISSING, None)], "humidity", 0, "frames_latest_rain.json"),  # 같은 수: humidity > no_data
+    ([(5, RAIN, None), (5, HUMID, None)], "no_data", 0, "frames_latest_rain.json"),                         # 행이 없는 9대는 no_data
+])
+def test_state_day_station(client, db, groups, reason, valid, example):
+    obs(db, ("아암", "2026-10-16T13:00+09", 11))
+    post(client, screen_rows(db, *groups))
+    assert state_of(client) == ("station", reason, {"valid": valid, "total": 19})
+    assert client.get("/api/frames/latest").json().keys() == mock("next/" + example).keys()
