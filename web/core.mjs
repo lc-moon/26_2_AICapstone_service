@@ -53,3 +53,12 @@ export function formatTime(t) {
   if(!t||!Number.isFinite(Date.parse(t)))return '기준 시각 없음';
   return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t));
 }
+
+// F27 등급별 행동 요령 한 줄. 환경부 예보 등급별 행동요령(지자체 게시본, 일반인·민감군)을 줄인 것 — 지어낸 문구를 넣지 않는다.
+// 좋음은 행동요령이 없어 빈칸. 원래 하루 평균 예보 기준이라 화면에는 "참고"로만 둔다
+export const ADVICE = {
+  '보통': '민감군은 몸 상태에 따라 실외 활동에 유의',
+  '나쁨': '장시간·무리한 실외 활동 제한 · 눈이 아프거나 기침·목 통증이 있으면 실외 활동을 피하기',
+  '매우나쁨': '장시간·무리한 실외 활동 제한 · 민감군은 가급적 실내 활동',
+};
+export const adviceFor = v => validValue(v) ? ADVICE[gradeOf(v).name] || '' : '';

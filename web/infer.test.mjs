@@ -14,3 +14,8 @@ test('mock rain preserves null and explanatory status',async()=>{
 });
 test('mismatched camera and invalid concentration rejected',()=>{assert.throws(()=>validateInference(sample,'other'));assert.throws(()=>validateInference({...sample,pm25:-1},'10042'));});
 test('mock busy returns 409 without POST',async()=>{await assert.rejects(requestInference('10042',{mock:true,scenario:'infer_busy',mockDelay:0,signal:new AbortController().signal,fetcher:async()=>({ok:true})}),e=>e.status===409);});
+test('F10 night answer without photo is accepted, value with no photo is not',()=>{
+ const night={camera_id:'10042',requested_at:'2026-11-08T18:30:00+09:00',captured_at:null,pm25:null,status:'밤 — 추정 안 함',photo_url:null};
+ assert.equal(validateInference(night,'10042').status,'밤 — 추정 안 함');
+ assert.throws(()=>validateInference({...night,pm25:3},'10042'));
+});

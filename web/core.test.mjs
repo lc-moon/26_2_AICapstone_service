@@ -11,3 +11,8 @@ test('polygon holes and outside locations excluded',()=>{const g={type:'Polygon'
 test('same slot updated_at change triggers repaint',()=>{assert(!frameChanged(day,{...day}));assert(frameChanged(day,{...day,updated_at:'2026-10-16T13:35:00+09:00'}));assert(frameChanged(day,night));});
 test('null accepted; malformed and mismatched frames rejected',()=>{assert.doesNotThrow(()=>validateFrame({...day,values:Array(grid.count).fill(null)},grid.count));for(const values of [[],Array(grid.count).fill(-1),Array(grid.count).fill('12'),Array(grid.count).fill(NaN)])assert.throws(()=>validateFrame({...day,values},grid.count));});
 test('time uses Seoul even with UTC input',()=>{assert.match(formatTime('2026-10-16T04:20:00Z'),/13:20/);assert.equal(formatTime(null),'기준 시각 없음');});
+test('F27 advice follows grade boundaries and stays empty for good or missing values',async()=>{
+ const {adviceFor}=await import('./core.mjs');
+ assert.equal(adviceFor(15),'');assert.equal(adviceFor(null),'');
+ assert.match(adviceFor(16),/민감군/);assert.match(adviceFor(36),/실외 활동 제한/);assert.match(adviceFor(76),/실내 활동/);
+});
