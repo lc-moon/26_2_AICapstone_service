@@ -18,6 +18,7 @@ pip install -r requirements.txt
 | `DATABASE_URL` | 예: `postgresql://postgres:비밀번호@localhost:5432/pm_map` |
 | `INGEST_TOKEN` | 추정기가 `Authorization: Bearer …`로 보낼 토큰. 비어 있으면 수신을 전부 거절 |
 | `AIRKOREA_API_KEY` | 에어코리아 일반 인증키(Encoding·Decoding 둘 다 됨). 비어 있으면 매시 수집을 켜지 않음(나머지 API는 정상) |
+| `INFER_CMD` | 직접 해보기 명령(팀장이 만든 `infer_now.py`). 뒤에 카메라 번호를 붙여 실행. 비어 있으면 `POST /api/infer`가 503. 로컬 개발은 `python tests/fake_infer.py`(`shared/mock/infer_ok.json`을 그대로 출력하는 가짜, 실제 추정 아님) |
 
 **PostgreSQL 준비** — DB만 만들면 테이블은 다음 단계가 만듭니다.
 
@@ -64,15 +65,17 @@ TEST_DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/pm_map_test 
 |---|---|
 | `POST /api/ingest/estimates` | 토큰이 틀리면 401, 형식이 틀리면 422(시각은 `+09:00` 같은 시간대 필수, `slot`은 :00/:20/:40). 같은 (camera_id, slot)은 덮어쓰고, 들어온 회차의 프레임을 그 회차 값 전부로 다시 계산 |
 | `GET /api/grid` | `shared/mock/grid.json`과 같은 모양. `boundary`는 `shared/boundary.geojson`의 `area` |
-| `GET /api/frames/latest` | 가장 최근 회차. 프레임이 하나도 없으면 404 |
-| `GET /api/point?lon=&lat=` | 범위 밖(`boundary.geojson`의 `area` 밖)이면 `{"inside": false}`. 안이면 그 칸의 최신 프레임 값·등급·회차·가장 가까운 CCTV 거리. 프레임이 없으면 `estimate: null`. `station` = 가장 가까운 비교용(`use_for_compare`) 측정소의 가장 최근 실측 한 줄. 그 줄이 결측이면 `pm25: null`(이전 시각·다른 측정소로 메우지 않음). 측정값이 하나도 없으면 `pm25`·`data_time`·`period`가 `null` |
+| `GET /api/frames/latest` | 가장 최근 회차. 프레임이 하나도 없으면 404. **전시용 `?source=cctv`**: 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차), CCTV 프레임이 없으면 404. `cctv` 말고 다른 값은 422 |
+| `GET /api/point?lon=&lat=` | `&source=cctv`면 `estimate`만 가장 최근 CCTV 프레임에서(없으면 `estimate: null`, `station`·`camera`는 그대로). 범위 밖(`boundary.geojson`의 `area` 밖)이면 `{"inside": false}`. 안이면 그 칸의 최신 프레임 값·등급·회차·가장 가까운 CCTV 거리. 프레임이 없으면 `estimate: null`. `station` = 가장 가까운 비교용(`use_for_compare`) 측정소의 가장 최근 실측 한 줄. 그 줄이 결측이면 `pm25: null`(이전 시각·다른 측정소로 메우지 않음). 측정값이 하나도 없으면 `pm25`·`data_time`·`period`가 `null`. `camera` = 가장 가까운 화면 범위 카메라(`grid_id` 있음, 103번 제외)의 가장 최근 `estimates` 한 줄과 `photo_url`(`/cam/{id}.jpg?v=촬영 시각 숫자`, `captured_at`이 없으면 회차 시각). 그 카메라 행이 없으면 `null` |
+| `POST /api/infer?camera_id=` | 직접 해보기. `cameras`에 없는 번호는 404(명령에 넘기기 전에 확인, 셸 안 씀). `INFER_CMD` + 번호를 별도 스레드에서 실행(그동안 다른 API는 바로 응답). 한 번에 하나(진행 중 409), 명령 종료 코드 75(정기 추정기가 도는 중)도 409. 같은 카메라 60초 안 재요청은 명령을 다시 돌리지 않고 `cached: true`. 30초 초과·실패·출력이 약속과 다르면 503. 응답 = 명령 출력 + `name`·`grade`·`cached`·`elapsed_s`. DB에 넣지 않음 |
 | `GET /api/health` | `last_slot`, `last_received_at`, `stale`. stale = 낮에 40분 넘게 추정값이 안 옴(밤과 해 뜬 직후 40분은 false). 낮·밤은 `sun.py`(수집기와 같은 식) |
 
 수신 응답 예: `{"rows_in":19, "rows_upserted":19, "unknown_cameras":[], "new_models":[], "frames":[{"slot":"2026-10-16T13:20:00+09:00","n_inputs":19}]}`
 
 - `cameras`에 없는 카메라 행은 저장하지 않고 `unknown_cameras`와 `ingest_log.error`에 남깁니다
 - 처음 보는 `model`은 `model_versions`에 자동 등록합니다(값을 버리지 않으려고). 응답 `new_models`로 알 수 있음
-- 한 회차의 값이 전부 `null`이면 그 회차 CCTV 프레임을 만들지 않습니다(`n_inputs: 0`). 측정소로 메우는 것은 다음 PR
+- 한 회차의 값이 전부 `null`이면 CCTV 프레임을 만들지 않고(`n_inputs: 0`), 그 회차 이전 가장 최근 실측으로 측정소 프레임을 만듭니다(`source: station`, `basis_time` = 그 실측 시각). 실측도 없으면 프레임 없음. 나중에 CCTV 값이 오면 CCTV 프레임으로 바뀝니다
+- 측정소 프레임은 이미 있는 CCTV 프레임을 덮어쓰지 않습니다(`ON CONFLICT … WHERE frames.source = 'station'`). 측정소 프레임 계산이 실패해도 추정값 수신은 성공합니다
 
 ## 에어코리아 실측 수집 (`airkorea.py`)
 
@@ -116,9 +119,11 @@ python airkorea.py      # 결과 요약 출력. 실제 API를 1회(인천·경�
 ## 로컬 개발용 CORS
 
 화면을 `http://localhost:8766/web/?api=http://localhost:8000`처럼 다른 포트에서 띄워 API를 부를 수 있게,
-`http://localhost:포트`와 `http://127.0.0.1:포트`에서 오는 `GET`만 허용합니다(`*`는 쓰지 않음). 배포 서버는 화면과 API가 같은 주소라 상관없습니다.
+`http://localhost:포트`와 `http://127.0.0.1:포트`에서 오는 `GET`·`POST`(직접 해보기)만 허용합니다(`*`는 쓰지 않음). 배포 서버는 화면과 API가 같은 주소라 상관없습니다.
 
-아직: 밤·빈 회차 → **이어서 할 일은 [NEXT.md](NEXT.md)**
+**밤 측정소 프레임**: 매시 수집이 끝나면(`run_hourly(after=night_frame)`) 밤(`sun.py`의 `is_day()`가 false)일 때 값이 있는 가장 최근 정시 실측으로 프레임을 만듭니다. `slot` = `basis_time` = 그 `data_time`, 입력은 그 시각에 PM2.5가 있는 측정소 전부(53곳 중), 보간은 CCTV와 같은 IDW
+
+**이어서 할 일은 [NEXT.md](NEXT.md)**
 
 ## 배포 (2026-10-27, 팀장)
 

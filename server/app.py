@@ -2,12 +2,17 @@
 import asyncio
 import hmac
 import json
+import logging
 import math
 import os
+import shlex
+import subprocess
+import threading
+import time
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +24,7 @@ from init_db import SHARED, connect
 from sun import is_day
 
 KST = timezone(timedelta(hours=9))
+log = logging.getLogger("uvicorn.error")
 METHOD = "idw 1/(d²+0.05)"
 STALE_AFTER = timedelta(minutes=40)   # 낮에 2회차(40분) 동안 추정값이 하나도 안 오면 stale
 GRADES = [(15, "좋음"), (35, "보통"), (75, "나쁨")]   # 반올림 후 판정, 그 위는 매우나쁨
@@ -28,7 +34,7 @@ GRADES = [(15, "좋음"), (35, "보통"), (75, "나쁨")]   # 반올림 후 판�
 async def lifespan(app):
     task = None
     if os.environ.get("AIRKOREA_API_KEY"):
-        task = asyncio.create_task(airkorea.run_hourly())
+        task = asyncio.create_task(airkorea.run_hourly(after=night_frame))
     else:
         airkorea.log.warning("AIRKOREA_API_KEY가 없어 에어코리아 매시 수집을 켜지 않습니다")
     app.state.airkorea_task = task
@@ -44,7 +50,7 @@ app = FastAPI(title="인천 초미세먼지 지도", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],   # POST = 직접 해보기(/api/infer)
 )
 
 
@@ -96,8 +102,15 @@ def rebuild_frame(conn, slot):
         (slot,),
     ).fetchall()
     if not inputs:
-        # 다른 시각 값으로 메우지 않는다. 측정소 프레임은 다음 PR(밤·빈 회차)
+        # 낮 빈 회차: CCTV 프레임을 지우고 그 회차 이전 가장 최근 실측으로 대신 만든다
         conn.execute("DELETE FROM frames WHERE slot = %s AND source = 'cctv'", (slot,))
+        try:
+            with conn.transaction():   # savepoint — 실패해도 추정값 수신은 그대로 성공
+                basis = latest_obs_time(conn, slot)
+                if basis:
+                    station_frame(conn, slot, basis)
+        except Exception:
+            log.exception("빈 회차 측정소 프레임 실패 %s", slot)
         return 0
     centers = conn.execute("SELECT center_lon, center_lat FROM grid_cells ORDER BY grid_id").fetchall()
     values = idw(centers, [(lon, lat, pm) for _, lon, lat, pm, _ in inputs])
@@ -113,7 +126,45 @@ def rebuild_frame(conn, slot):
     return len(inputs)
 
 
-def log_ingest(conn, started, rows_in, rows_upserted, error):
+def latest_obs_time(conn, until=None):
+    """PM2.5 값이 하나라도 있는 가장 최근 data_time(until 이하)"""
+    return conn.execute("SELECT max(data_time) FROM observations WHERE pm25 IS NOT NULL"
+                        " AND (%s::timestamptz IS NULL OR data_time <= %s)", (until, until)).fetchone()[0]
+
+
+def station_frame(conn, slot, basis):
+    """basis 시각에 값이 있는 측정소 전부로 IDW → slot 프레임(source='station').
+    이미 CCTV 프레임이 있는 slot은 건드리지 않는다(CCTV가 이김). 넣었으면 측정소 수, 아니면 0"""
+    inputs = conn.execute(
+        """SELECT o.station_name, s.lon, s.lat, o.pm25 FROM observations o JOIN stations s USING (station_name)
+           WHERE o.data_time = %s AND o.pm25 IS NOT NULL ORDER BY o.station_name""",
+        (basis,),
+    ).fetchall()
+    if not inputs:
+        return 0
+    centers = conn.execute("SELECT center_lon, center_lat FROM grid_cells ORDER BY grid_id").fetchall()
+    values = idw(centers, [(lon, lat, pm) for _, lon, lat, pm in inputs])
+    cur = conn.execute(
+        """INSERT INTO frames (slot, source, basis_time, n_inputs, inputs, values, method, model, created_at)
+           VALUES (%s, 'station', %s, %s, %s, %s, %s, NULL, now())
+           ON CONFLICT (slot) DO UPDATE SET basis_time = EXCLUDED.basis_time, n_inputs = EXCLUDED.n_inputs,
+             inputs = EXCLUDED.inputs, values = EXCLUDED.values, method = EXCLUDED.method, created_at = now()
+           WHERE frames.source = 'station'""",
+        (slot, basis, len(inputs), [i[0] for i in inputs], values, METHOD),
+    )
+    return len(inputs) if cur.rowcount else 0
+
+
+def night_frame():
+    """매시 에어코리아 수집 뒤(airkorea.run_hourly). 밤이면 가장 최근 정시 실측으로 slot = basis_time 프레임"""
+    if is_day(now()):
+        return 0
+    with connect() as conn, conn.transaction():
+        t = latest_obs_time(conn)
+        return station_frame(conn, t, t) if t else 0
+
+
+def log_ingest(conn,started, rows_in, rows_upserted, error):
     conn.execute(
         "INSERT INTO ingest_log (source, started_at, rows_in, rows_upserted, error) VALUES ('estimator', %s, %s, %s, %s)",
         (started, rows_in, rows_upserted, error),
@@ -164,7 +215,7 @@ def ingest_estimates(body: IngestBody):
         "rows_upserted": len(rows),
         "unknown_cameras": unknown,
         "new_models": new_models,
-        "frames": frames,   # 다시 계산한 회차. n_inputs 0 = 유효값 없어 프레임 없음
+        "frames": frames,   # 다시 계산한 회차. n_inputs 0 = CCTV 유효값 없음(측정소 실측이 있으면 측정소 프레임으로 대신)
     }
 
 
@@ -209,11 +260,17 @@ def grid():
     return {"cell_size_m": 1000, "count": len(cells), "cells": cells, "boundary": boundary()}
 
 
+# 전시용(S10): source=cctv면 가장 최근 CCTV 회차(밤에도 그날 마지막 낮 회차). source가 없으면 가장 최근 프레임. 다른 값은 422
+Source = Annotated[Optional[Literal["cctv"]], Query()]
+ONLY = " WHERE (%s::text IS NULL OR source = %s)"
+
+
 @app.get("/api/frames/latest")
-def frames_latest():
+def frames_latest(source: Source = None):
     with connect() as conn:
         f = conn.execute(
-            "SELECT slot, source, basis_time, n_inputs, values, created_at FROM frames ORDER BY slot DESC LIMIT 1"
+            "SELECT slot, source, basis_time, n_inputs, values, created_at FROM frames" + ONLY +
+            " ORDER BY slot DESC LIMIT 1", (source, source)
         ).fetchone()
     if not f:
         raise HTTPException(404, "아직 프레임이 없습니다")
@@ -236,22 +293,42 @@ def cell_at(conn, lon, lat):
 
 
 @app.get("/api/point")
-def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90)):
+def point(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90), source: Source = None):
     if not inside_area(lon, lat):
         return {"inside": False}
     with connect() as conn:
         grid_id, gu, _, _ = cell_at(conn, lon, lat)
-        f = conn.execute("SELECT slot, source, values[%s] FROM frames ORDER BY slot DESC LIMIT 1",
-                         (grid_id + 1,)).fetchone()   # PostgreSQL 배열은 1부터
+        f = conn.execute("SELECT slot, source, values[%s] FROM frames" + ONLY + " ORDER BY slot DESC LIMIT 1",
+                         (grid_id + 1, source, source)).fetchone()   # PostgreSQL 배열은 1부터
         cams = conn.execute("SELECT lon, lat FROM cameras").fetchall()
         station = nearest_station(conn, lon, lat)
+        camera = nearest_camera(conn, lon, lat)
     estimate = None
     if f:
         slot, source, v = f
         v = None if v is None or math.isnan(v) else round(v, 1)
         estimate = {"pm25": v, "grade": grade(v), "slot": iso(slot), "source": source,
                     "nearest_cctv_km": round(min(math.hypot((lon - x) * KX, (lat - y) * KY) for x, y in cams), 1)}
-    return {"inside": True, "gu": gu, "grid_id": grid_id, "estimate": estimate, "station": station}
+    return {"inside": True, "gu": gu, "grid_id": grid_id, "estimate": estimate, "station": station, "camera": camera}
+
+
+def nearest_camera(conn, lon, lat):
+    """가장 가까운 화면 범위 카메라(grid_id 있음 — 103번 제외)의 가장 최근 estimates 한 줄(NEXT.md S3).
+    사진 파일은 추정기가 /cam/{camera_id}.jpg로 덮어쓴다. 그 카메라 행이 없으면 None"""
+    cams = conn.execute("SELECT camera_id, name, lon, lat FROM cameras WHERE grid_id IS NOT NULL").fetchall()
+    if not cams:
+        return None
+    d, cid, name = min((math.hypot((lon - x) * KX, (lat - y) * KY), c, n) for c, n, x, y in cams)
+    row = conn.execute("SELECT slot, captured_at, pm25_est, status FROM estimates WHERE camera_id = %s"
+                       " ORDER BY slot DESC LIMIT 1", (cid,)).fetchone()
+    if not row:
+        return None
+    slot, captured, pm, status = row
+    # ?v= 는 브라우저 캐시 깨기용(한국 시각 숫자). captured_at이 비어 있으면 회차 시각으로
+    v = (captured or slot).astimezone(KST).strftime("%Y%m%d%H%M%S")
+    return {"camera_id": cid, "name": name, "distance_km": round(d, 1), "slot": iso(slot),
+            "captured_at": iso(captured), "pm25": None if pm is None else round(pm, 1), "status": status,
+            "photo_url": f"/cam/{cid}.jpg?v={v}"}
 
 
 def period(t):
@@ -282,3 +359,68 @@ def health():
     # 밤에는 추정기가 쉬므로 제외. 해 뜬 직후 40분은 첫 회차를 기다리는 중이라 제외
     stale = is_day(t) and is_day(t - STALE_AFTER) and (last_received is None or t - last_received > STALE_AFTER)
     return {"last_slot": iso(last_slot), "last_received_at": iso(last_received), "stale": stale}
+
+
+INFER_TIMEOUT = 30        # 초. VM 측정 약 12초
+INFER_CACHE_FOR = 60      # 같은 카메라를 60초 안에 다시 누르면 지난 결과
+BUSY = "다른 추정이 진행 중입니다. 잠시 뒤 다시 눌러 주세요"
+UNAVAILABLE = "지금은 추정할 수 없습니다"
+# ponytail: 프로세스 하나 안에서만 한 번에 하나. 워커를 여럿 띄우면 워커마다 하나씩(정기 추정기와의 충돌은 명령의 종료 코드 75가 막음)
+infer_lock = threading.Lock()
+infer_cache = {}          # camera_id → (끝난 시각, 응답)
+
+
+def is_num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+
+
+@app.post("/api/infer")
+def infer(camera_id: str = Query(min_length=1, max_length=20)):
+    """직접 해보기: INFER_CMD + 카메라 번호를 실행해 지금 사진으로 추정(NEXT.md S5). DB에는 넣지 않는다.
+    보통 def라 FastAPI가 별도 스레드에서 돌려, 그동안 다른 API는 멈추지 않는다"""
+    with connect() as conn:   # 공개 주소라 아무 문자열이나 온다 — 명령에 넘기기 전에 표에 있는지
+        cam = conn.execute("SELECT name FROM cameras WHERE camera_id = %s", (camera_id,)).fetchone()
+    if not cam:
+        raise HTTPException(404, "없는 카메라입니다")
+    cmd = os.environ.get("INFER_CMD", "").strip()
+    if not cmd:
+        log.warning("INFER_CMD가 없어 직접 해보기를 할 수 없습니다")
+        raise HTTPException(503, UNAVAILABLE)
+
+    hit = infer_cache.get(camera_id)
+    if hit and (now() - hit[0]).total_seconds() < INFER_CACHE_FOR:
+        return {**hit[1], "cached": True}
+    if not infer_lock.acquire(blocking=False):
+        raise HTTPException(409, BUSY)
+    try:
+        started = time.monotonic()
+        try:
+            r = subprocess.run([*shlex.split(cmd), camera_id], capture_output=True, timeout=INFER_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            log.warning("직접 해보기 %s: %s초 넘음", camera_id, INFER_TIMEOUT)
+            raise HTTPException(503, UNAVAILABLE) from None
+        except OSError as e:
+            log.warning("직접 해보기 %s: 명령 실행 실패 %s", camera_id, type(e).__name__)
+            raise HTTPException(503, UNAVAILABLE) from None
+        if r.returncode == 75:   # 정기 추정기가 도는 중
+            raise HTTPException(409, BUSY)
+        if r.returncode:
+            log.warning("직접 해보기 %s: 종료 코드 %s %s", camera_id, r.returncode,
+                        r.stderr.decode("utf-8", "replace")[-300:])
+            raise HTTPException(503, UNAVAILABLE)
+        try:
+            out = json.loads(r.stdout.decode("utf-8").strip().splitlines()[-1])
+            pm = out["pm25"]
+            ok = (isinstance(out, dict) and str(out["camera_id"]) == camera_id and (pm is None or is_num(pm))
+                  and isinstance(out["captured_at"], str))
+        except (ValueError, IndexError, KeyError, TypeError):
+            ok = False
+        if not ok:
+            log.warning("직접 해보기 %s: 출력이 약속과 다름 %r", camera_id, r.stdout[-300:])
+            raise HTTPException(503, UNAVAILABLE)
+        res = {**out, "name": cam[0], "grade": grade(pm), "cached": False,
+               "elapsed_s": round(time.monotonic() - started, 1)}
+        infer_cache[camera_id] = (now(), res)
+        return res
+    finally:
+        infer_lock.release()
