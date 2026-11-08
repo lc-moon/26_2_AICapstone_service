@@ -113,8 +113,8 @@ def test_seconds_until_next_run(now, secs):
 def test_lifespan_registers_and_cancels(monkeypatch):
     started = []
 
-    async def fake_loop():
-        started.append(1)
+    async def fake_loop(after=None):
+        started.append(after)
         await asyncio.Event().wait()
 
     monkeypatch.setenv("AIRKOREA_API_KEY", KEY)
@@ -122,7 +122,9 @@ def test_lifespan_registers_and_cancels(monkeypatch):
     from app import app
     with TestClient(app):
         task = app.state.airkorea_task
-        assert task is not None and not task.done() and started == [1]
+        assert task is not None and not task.done()
+        import app as app_module
+        assert started == [app_module.night_frame]   # 수집 뒤 밤 측정소 프레임
     assert task.cancelled()
 
 
@@ -153,6 +155,26 @@ def test_run_hourly_survives_failures(monkeypatch):
 
     asyncio.run(asyncio.wait_for(go(), 5))
     assert len(calls) >= 3
+
+
+def test_run_hourly_runs_after_even_when_it_fails(monkeypatch):
+    calls = []
+
+    def fake_after():
+        calls.append("after")
+        raise RuntimeError("프레임 실패")
+
+    monkeypatch.setattr(airkorea, "seconds_until_next_run", lambda now: 0)
+    monkeypatch.setattr(airkorea, "collect", lambda: calls.append("collect"))
+
+    async def go():
+        t = asyncio.create_task(airkorea.run_hourly(after=fake_after))
+        while len(calls) < 4:
+            await asyncio.sleep(0.01)
+        t.cancel()
+
+    asyncio.run(asyncio.wait_for(go(), 5))
+    assert calls[:4] == ["collect", "after", "collect", "after"]   # after가 실패해도 다음 시각 수집은 돈다
 
 
 # ── DB (TEST_DATABASE_URL 있을 때만) ──────────────────────────

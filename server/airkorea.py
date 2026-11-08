@@ -167,14 +167,19 @@ def seconds_until_next_run(now):
     return (nxt - now).total_seconds()
 
 
-async def run_hourly():
-    """서버가 켜져 있는 동안 매시 50분에 collect. 실패해도 다음 시각에 다시 돈다."""
+async def run_hourly(after=None):
+    """서버가 켜져 있는 동안 매시 50분에 collect, 이어서 after()(app.py의 밤 측정소 프레임). 실패해도 다음 시각에 다시 돈다."""
     while True:
         await asyncio.sleep(seconds_until_next_run(datetime.now(KST)))
         try:
             await asyncio.to_thread(collect)   # 한 번에 하나씩 — 앞 수집이 끝나야 다음 대기
         except Exception:
             log.exception("에어코리아 수집 실패")
+        if after:
+            try:
+                await asyncio.to_thread(after)
+            except Exception:
+                log.exception("밤 측정소 프레임 실패")
 
 
 if __name__ == "__main__":
