@@ -11,3 +11,5 @@ test('original, external and traversal photo paths are not shown',()=>{
  for(const path of [null,'https://example.com/a.jpg','//example.com/a.jpg','/cam/../raw.jpg','/cam/%2e%2e/raw.jpg','/original/10042.jpg','javascript:alert(1)'])assert.equal(photoURL(path),null);
 });
 test('zero is valid but null is not zero',()=>{assert.equal(concentration(0),'0 ㎍/㎥');assert.equal(concentration(null),'값 없음');});
+
+test('panel title does not repeat the district',async()=>{const {panelTitle}=await import('./evidence.mjs');assert.equal(panelTitle('인천 미추홀구 용현동 88-16','미추홀구'),'인천 미추홀구 용현동 88-16');assert.equal(panelTitle('인하대학교','미추홀구'),'인하대학교 · 미추홀구');assert.equal(panelTitle(null,'미추홀구'),'미추홀구 부근');});

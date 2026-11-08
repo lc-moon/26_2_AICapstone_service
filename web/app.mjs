@@ -1,6 +1,6 @@
 import {saveView,takeView} from './view-state.mjs';
-import {initEvidencePins,showEvidencePins,clearEvidencePins} from './evidence-pins.mjs';
-import {renderFrameStatus} from './frame-status.mjs';
+import {initEvidencePins,showEvidencePins,clearEvidencePins,restoreEvidenceView} from './evidence-pins.mjs';
+import {renderFrameStatus,mountNotice} from './frame-status.mjs';
 import {apiPath,expoLabel} from './expo.mjs';
 import {mountSearch} from './search.mjs';
 import {mountInference} from './infer.mjs';
@@ -12,11 +12,12 @@ let restored=null;
 if(params.get('restore')==='1'||performance.getEntriesByType('navigation')[0]?.type==='back_forward'){try{restored=takeView(sessionStorage);}catch{}params.delete('restore');history.replaceState(null,'',location.pathname+(params.size?'?'+params:'')+location.hash);}
 $('about-link').href=`about.html${location.search}`;
 const expo=params.get('expo')==='1';
+const syncNotice=mountNotice($('notice'));
 const mock=params.get('mode')==='mock', scenario=params.get('scenario')||'day';
 // API base is explicit; production defaults to same-origin and never silently uses mocks.
 const base=(params.get('api')||'').replace(/\/$/,'');
 let grid,layout,map,current,bounds,selection=null,selectionName=null,pointRequest=0,busy=false,timer,toastTimer;
-let disposeInference=()=>{},inferenceBusy=false;
+let disposeInference=()=>{},inferenceBusy=false,liveNight=false;   // 전시 주소는 지도가 낮 회차라, 지금이 밤인지는 일반 응답으로 따로 본다
 let mapLoaded,mapOk=false;const mapReady=new Promise(r=>mapLoaded=r);   // F16: 클릭·검색은 바로 받고, 지도 그리기만 load를 기다린다
 let loadIssue='',healthIssue='',mapIssue='',health=null;
 const empty={type:'FeatureCollection',features:[]};
@@ -45,21 +46,23 @@ function showStatus(){
  $('status').textContent=messages.filter(Boolean).join('\n');$('status').hidden=!$('status').textContent;
 }
 function ago(t){const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?' · 방금':m<60?` · ${m}분 전`:m<1440?` · ${Math.floor(m/60)}시간 전`:` · ${Math.floor(m/1440)}일 전`;}function updateHeader(){
- if(!current){$('time').textContent=expo?expoLabel(null):'아직 값 없음';$('source').textContent='첫 데이터가 들어오면 자동으로 표시합니다.';return;}
+ if(!current){$('time').textContent=expo?expoLabel(null):'아직 값 없음';$('source').textContent='첫 데이터가 들어오면 바로 보여 드려요';return;}
  $('time').textContent=expo?expoLabel(current):`${formatTime(current.basis_time||current.slot)} 기준${ago(current.basis_time||current.slot)}`;
  // source=station can also mean daytime missing-camera fallback; do not infer night.
- renderFrameStatus($('source'),current,current.source==='station'?`${mock&&scenario==='night'?'밤 · ':'밤·결측 대체 · '}측정소 실측 기반 보간${mock?' · 예시값':''}`:'CCTV 영상 기반 추정 · 20분 회차 / 1분마다 확인');
+ if(!expo)syncNotice(current,!!selection);
+ renderFrameStatus($('source'),current,current.source==='station'?`${mock&&scenario==='night'?'밤 · ':'밤·결측 대체 · '}측정소에서 잰 값을 이어 그렸어요${mock?' · 예시값':''}`:'CCTV 영상 기반 추정 · 20분 회차 / 1분마다 확인');
 }
 function draw(){const image=cloudImage(grid,current?.values||grid.cells.map(()=>null),layout);if(map.getSource('cloud'))map.getSource('cloud').updateImage(image);}
 async function refresh(){
  if(busy||!grid)return;busy=true;
  try{
-  const [f,h]=await Promise.allSettled([frameData(),mock?fixture(scenario==='stale'?'health_stale':'health'):json(`${base}/api/health`,{allow404:true})]);
+  const [f,h,l]=await Promise.allSettled([frameData(),mock?fixture(scenario==='stale'?'health_stale':'health'):json(`${base}/api/health`,{allow404:true}),expo&&!mock?json(`${base}/api/frames/latest`,{allow404:true}):null]);
+  liveNight=mock?scenario==='night':l.value?.reason==='night';
   let changed=false;
   if(f.status==='fulfilled'){
    const next=f.value===null?null:validateFrame(f.value,grid.cells.length);
    changed=next===null?current!==null:frameChanged(current,next);current=next;loadIssue='';updateHeader();if(map?.getSource('cloud')&&changed)draw();
-  }else{loadIssue='데이터 갱신 실패 · 마지막 정상값을 표시합니다. 새로고침으로 다시 시도하세요.';if(!current)$('time').textContent='데이터 연결 실패';}
+  }else{loadIssue='새 값을 가져오지 못했어요. 마지막 값을 보여 드려요';if(!current)$('time').textContent='데이터 연결 실패';}
   if(h.status==='fulfilled'&&h.value&&typeof h.value.stale==='boolean'){health=h.value;healthIssue='';}
   else{health=null;healthIssue='갱신 상태 확인 불가 · 상태 API 연결을 기다리고 있습니다.';}
   if(changed&&selection&&!inferenceBusy&&mapOk)void selectPoint(selection,false,selectionName);   // 지도가 뜨기 전 고른 곳은 그 요청이 끝까지 간다
@@ -68,11 +71,12 @@ async function refresh(){
 }
 function text(tag,content,cls){const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el;}
 function displayPoint(data){
+ if(!expo&&data.estimate?.source==='station')data={...data,camera:null};   // 측정소 지도(밤·비·습도·카메라 부족)의 농도에는 CCTV 사진이 쓰이지 않는다
  $('panel').classList.toggle('no-camera',!data.camera);
- renderEvidence($('details'),data,{mock,base,placeName:selectionName});
+ renderEvidence($('details'),data,{mock,base,placeName:selectionName?.name,placeGu:selectionName?.gu});
  showEvidencePins(map,selection,data);
  if(expo&&data.estimate?.source!=='cctv')$('details').prepend(text('p','전시용 CCTV 상세 미지원 · 응답에 표시된 기준 시각과 출처를 확인해 주세요.','expo-note'));
- if(data.camera)disposeInference=mountInference($('details').querySelector('.evidence-camera'),data.camera,{mock,base,scenario},value=>{inferenceBusy=value;});
+ if(data.camera)disposeInference=mountInference($('details').querySelector('.evidence-camera'),data.camera,{mock,base,scenario,expo,night:expo&&liveNight},value=>{inferenceBusy=value;});
 }
 async function getPoint(p){
  if(!mock)return json(`${base}${apiPath('/api/point',{expo,query:{lon:p[0],lat:p[1]}})}`,{allow404:true});
@@ -83,19 +87,20 @@ async function getPoint(p){
 }
 async function selectPoint(p,fly=true,placeName=null){
  if(!inside(p,grid.boundary)){notify('CCTV가 없는 곳(영종·강화·섬)은 추정하지 않아요. 인천 내륙과 송도를 눌러 주세요.');return;}
- disposeInference();clearEvidencePins();selection=p;selectionName=placeName;const request=++pointRequest;$('panel').hidden=false;$('hint').hidden=true;
- $('details').replaceChildren(text('div','선택한 위치','place'),text('p','농도와 측정소 정보를 확인하고 있습니다…'));
+ disposeInference();if(!fly)restoreEvidenceView();clearEvidencePins();selection=p;selectionName=placeName;const request=++pointRequest;$('panel').hidden=false;$('hint').hidden=true;
+ $('details').replaceChildren(text('div','선택한 위치','place'),text('p','농도를 확인하고 있어요'));
  const pending=getPoint(p);pending.catch(()=>{});await mapReady;if(request!==pointRequest)return;
  map.getSource('pick').setData({type:'Feature',properties:{},geometry:{type:'Point',coordinates:p}});
  document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');if(fly)map.flyTo({center:p,zoom:15.4,pitch:60,duration:motion,essential:true,padding:panelPad(true)});
  try{const data=await pending;if(request!==pointRequest)return;
   if(!data){$('details').replaceChildren(text('div','상세 정보 준비 중','place'),text('p','지점 상세 API가 아직 제공되지 않습니다. 지도에서는 최신 격자 분포를 확인할 수 있습니다.'));return;}
   if(!data.inside){$('details').replaceChildren(text('p','CCTV가 없는 곳(영종·강화·섬)은 추정하지 않아요. 인천 내륙과 송도를 눌러 주세요.'));return;}displayPoint(data);if(fly)settle();
- }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도에서 다시 선택해 주세요.'));}
+ }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도를 다시 눌러 주세요'));}
 }
 function closePanel(){disposeInference();clearEvidencePins();selection=null;selectionName=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;map?.getSource('pick')?.setData(empty);}
 function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:{top:0,bottom:0,left:0,right:0}});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(){
- const p=$('panel'),phone=matchMedia('(max-width:700px)').matches;
+ const p=$('panel'),phone=matchMedia('(max-width:700px)').matches,r=p.getBoundingClientRect();
+ if(!phone&&(r.left-40>innerWidth/2||r.right+40<innerWidth/2||r.top-40>innerHeight/2))return {top:0,bottom:0,left:0,right:0};   // 패널이 화면 정중앙을 안 가리면 고른 곳을 정중앙에
  const visible=['title','legend','place-search'].map(id=>$(id)).filter(e=>e?.getClientRects().length);
  const top=phone?Math.min(innerHeight*.4,Math.max(0,...visible.map(e=>e.getBoundingClientRect().bottom))+8):16;
  const bottom=Math.max(0,Math.min(p.offsetHeight+(parseFloat(getComputedStyle(p).bottom)||0)+12,innerHeight-top-100));
@@ -137,11 +142,11 @@ function wire(){
  $('search-toggle').onclick=()=>toggleSearch(!document.body.classList.contains('search-open'));
  $('place-search').addEventListener('keydown',event=>{if(event.key==='Escape'&&matchMedia('(max-width:700px)').matches){event.stopPropagation();toggleSearch(false);}});
  document.addEventListener('click',event=>{const a=event.target.closest('a');if(!a||!mapOk)return;const u=new URL(a.href,location.href);if(u.origin===location.origin&&u.pathname.endsWith('/about.html')){const c=map.getCenter();try{saveView(sessionStorage,{center:[c.lng,c.lat],zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding(),selection,name:null});}catch{}}});
- void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name)=>{void selectPoint(p,true,name);if(matchMedia('(max-width:700px)').matches)toggleSearch(false);}});
+ void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name,gu)=>{void selectPoint(p,true,{name,gu});if(matchMedia('(max-width:700px)').matches)toggleSearch(false);}});
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
  $('view-2d').onclick=()=>setView(true);$('view-3d').onclick=()=>setView(false);
  $('retry').onclick=()=>{if(mapIssue)location.reload();else void refresh();};
- $('location').onclick=()=>{if(!navigator.geolocation){notify('이 브라우저에서는 위치를 확인할 수 없습니다.');return;}navigator.geolocation.getCurrentPosition(pos=>{void selectPoint([pos.coords.longitude,pos.coords.latitude]);const a=pos.coords.accuracy;if(a>500)notify(`PC에서는 위치가 부정확할 수 있어요 (오차 약 ${a>=1000?(a/1000).toFixed(1)+'km':Math.round(a)+'m'})`);},()=>notify('위치를 확인하지 못했습니다. 위치 권한을 확인하거나 지도에서 선택해 주세요.'),{timeout:10000,maximumAge:60000});};
+ $('location').onclick=()=>{if(!navigator.geolocation){notify('이 브라우저에서는 위치를 확인할 수 없어요');return;}navigator.geolocation.getCurrentPosition(pos=>{void selectPoint([pos.coords.longitude,pos.coords.latitude]);const a=pos.coords.accuracy;if(a>500)notify(`PC에서는 위치가 부정확할 수 있어요 (오차 약 ${a>=1000?(a/1000).toFixed(1)+'km':Math.round(a)+'m'})`);},()=>notify('위치를 확인하지 못했어요. 위치 권한을 확인하거나 지도를 눌러 주세요'),{timeout:10000,maximumAge:60000});};
 }
 async function start(){
  try{
@@ -174,12 +179,12 @@ async function start(){
    initEvidencePins(map,{mock,base});
    map.addSource('pick',{type:'geojson',data:empty});map.addLayer({id:'pick',type:'circle',source:'pick',paint:{'circle-radius':7,'circle-color':'#235954','circle-stroke-color':'#fff','circle-stroke-width':3}});
    const hadRestored=!!restored;
-   $('hint').textContent='궁금한 곳을 눌러 농도를 확인하세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:restored.padding||{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();mapOk=true;mapLoaded();
+   $('hint').textContent='궁금한 곳을 눌러 보세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:restored.padding||{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();mapOk=true;mapLoaded();
    if(restored?.selection)void selectPoint(restored.selection,false,restored.name);restored=null;   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다
    if(mock&&params.has('sample')&&!hadRestored&&!selection){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}
   });
   await refresh();timer=setInterval(()=>void refresh(),60000);
- }catch(e){loadIssue=`화면을 불러올 수 없습니다. ${e.message}`;showStatus();$('retry').onclick=()=>location.reload();}
+ }catch(e){loadIssue=`화면을 불러오지 못했어요. ${e.message}`;showStatus();$('retry').onclick=()=>location.reload();}
 }
 addEventListener('pagehide',()=>{disposeInference();clearInterval(timer);clearTimeout(toastTimer);});void start();
 

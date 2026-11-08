@@ -1,7 +1,7 @@
 import {element,cameraFigure,concentration} from './evidence.mjs';
 import {formatTime,validValue,gradeOf} from './core.mjs';
 export function inferFailure(status) {
-  return status===409?'다른 분이 추정 중이에요. 잠시 뒤 다시 눌러 주세요.':'지금은 할 수 없어요. 기존 회차 사진과 값은 그대로 확인할 수 있습니다.';
+  return status===409?'다른 분이 추정 중이에요. 잠시 뒤 다시 눌러 주세요.':'지금은 할 수 없어요. 마지막 회차 사진과 값은 그대로 볼 수 있어요';
 }
 export function validateInference(data,cameraId) {
   const night=data?.captured_at==null&&data?.pm25===null;   // F10: 밤에는 사진을 안 찍고 사유만 온다
@@ -16,8 +16,9 @@ function wait(ms,signal) {
     signal.addEventListener('abort',abort,{once:true});
   });
 }
-export async function requestInference(cameraId,{mock,scenario,base,signal,fetcher=fetch,mockDelay=10000}) {
+export async function requestInference(cameraId,{mock,scenario,base,signal,expo,fetcher=fetch,mockDelay=10000}) {
   let response;
+  if(mock&&expo&&scenario==='night')return {camera_id:cameraId,captured_at:null,pm25:null,status:'밤 — 추정 안 함'};
   if(mock){
     const filename=scenario==='infer_rain'?'infer_rain':scenario==='infer_busy'?'infer_busy':'infer_ok';
     response=await fetcher(`../shared/mock/${filename}.json`,{signal});
@@ -33,7 +34,7 @@ export async function requestInference(cameraId,{mock,scenario,base,signal,fetch
 // Presentation timers are separate from the single POST request. Never poll/retry a POST.
 export function mountInference(host,camera,options,onBusy=()=>{}) {
   const section=element('section',null,'infer-section');
-  const button=element('button','지금 찍어서 추정해 보기','infer-button');button.type='button';
+  const button=element('button',options.night?'마지막 낮 사진으로 과정 보기':'지금 찍어서 추정해 보기','infer-button');button.type='button';
   const status=element('p');status.setAttribute('role','status');
   const result=element('div',null,'infer-result');
   section.append(button,status,result);host.append(section);
@@ -42,18 +43,25 @@ export function mountInference(host,camera,options,onBusy=()=>{}) {
   button.onclick=async()=>{
     if(controller||disposed)return;
     controller=new AbortController();onBusy(true);button.disabled=true;result.replaceChildren();
-    status.textContent='① 사진 찍는 중 · 아래 단계는 대기 안내입니다.';
-    timers.push(setTimeout(()=>status.textContent='② 위쪽 60%를 모델 입력으로 준비하는 중…',5000));
-    timers.push(setTimeout(()=>status.textContent='③ 모델 계산 중 · 최대 30초 기다려 주세요.',8000));
+    status.textContent=options.expo?'사진을 준비하고 있어요':'사진을 찍고 있어요';   // 전시 주소의 밤에는 새로 찍지 않는다
+    timers.push(setTimeout(()=>status.textContent='사진 위쪽만 남기고 있어요',5000));
+    timers.push(setTimeout(()=>status.textContent='농도를 계산하고 있어요 (최대 30초)',8000));
     timers.push(setTimeout(()=>controller?.abort(),30000));
     try{
       const data=await requestInference(camera.camera_id,{...options,signal:controller.signal});
       if(disposed)return;
-      status.textContent='④ 결과 확인';
+      if(options.expo&&data.captured_at==null&&/밤/.test(data.status||'')){   // 전시 주소의 밤: 사진을 새로 찍지 않으므로 마지막 낮 회차 사진으로 같은 단계를 보여 준다
+        clear();status.textContent='결과를 불러오고 있어요';
+        await wait(2500,controller.signal);if(disposed)return;
+        status.textContent='다 됐어요';
+        result.append(element('h4','마지막 낮 사진의 추정 결과'),cameraFigure(camera,options),element('p',validValue(camera.pm25)?`${concentration(camera.pm25)} · ${gradeOf(camera.pm25).name}`:camera.status||'추정 안 함','camera-result'),element('p',`${formatTime(camera.captured_at)}에 찍은 마지막 낮 사진이에요. 밤에는 새로 찍어 추정하지 않아요.`));
+        return;
+      }
+      status.textContent='다 됐어요';
       if(data.captured_at==null){result.append(element('h4','지금은 추정하지 않아요'),element('p',/밤/.test(data.status||'')?'밤에는 어두운 사진을 학습하지 않아 추정하지 않아요. 지도는 측정소 실측으로 채워져 있습니다.':(data.status||'추정 안 함'),'camera-result'));return;}
       result.append(element('h4',data.cached?'방금 누른 결과':'지금 촬영한 사진의 추정 결과'));
       if(options.mock)result.append(element('p','MOCK · 현재 촬영이 아닌 예시 결과입니다.'));
-      result.append(cameraFigure({...camera,...data},options),element('p',validValue(data.pm25)?`${concentration(data.pm25)} · ${gradeOf(data.pm25).name}`:data.status||'추정 안 함','camera-result'),element('p',`${formatTime(data.captured_at)} 촬영${Number.isFinite(data.elapsed_s)?' · 처리 '+data.elapsed_s.toFixed(1)+'초':''}`),element('p','이 즉석 결과는 위 지도와 정기 회차 값을 바꾸지 않습니다.'));
+      result.append(cameraFigure({...camera,...data},options),element('p',validValue(data.pm25)?`${concentration(data.pm25)} · ${gradeOf(data.pm25).name}`:data.status||'추정 안 함','camera-result'),element('p',`${formatTime(data.captured_at)} 촬영${Number.isFinite(data.elapsed_s)?' · 처리 '+data.elapsed_s.toFixed(1)+'초':''}`),element('p','이 결과는 지도 값을 바꾸지 않아요'));
     }catch(error){if(!disposed)status.textContent=inferFailure(error?.status);}
     finally{clear();controller=null;if(!disposed){button.disabled=false;onBusy(false);}}
   };
