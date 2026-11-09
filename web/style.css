@@ -116,6 +116,8 @@ b,strong{font-weight:500}
 #panel{position:fixed;left:0;right:0;bottom:0;height:380px;z-index:5;padding:28px 32px;border-top:1px solid var(--line);
   background:radial-gradient(1100px 360px at 18% -8%,color-mix(in srgb,var(--glow) 34%,transparent),transparent 72%),radial-gradient(1200px 300px at 78% -12%,color-mix(in srgb,var(--glow) 22%,transparent),transparent 70%),linear-gradient(180deg,color-mix(in srgb,var(--glow) 8%,var(--surf)),var(--surf) 60%);
   background-color:var(--surf);transition:--glow 600ms var(--ease-sheet);animation:dock-up 420ms var(--ease-sheet) both}
+/* 그래픽 가속이 꺼진 크롬은 완전히 불투명한 판에 가려진 지도 영역을 위아래 뒤집힌 자리에서 지운다. 불투명도를 살짝 낮춰 막는다 */
+#panel,#topbar{opacity:.999}
 @keyframes dock-up{from{transform:translateY(100%)}to{transform:none}}
 #close{position:absolute;right:36px;top:28px;width:40px;height:40px;z-index:2;border:1px solid var(--line-strong);border-radius:var(--r-btn);background:var(--surf);font-size:15px}
 #details{height:100%}
