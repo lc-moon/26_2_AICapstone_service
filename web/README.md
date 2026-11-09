@@ -27,8 +27,8 @@ python3 -m http.server 8766 --bind 127.0.0.1
 
 - 색·글자·간격·움직임 변수는 `style.css` 맨 위 한곳에 있다. 글꼴은 `fonts/PretendardVariable.woff2`(SIL OFL)를 직접 제공한다.
 - 일몰 후에는 다크(`theme.mjs`, 서버 `sun.py`와 같은 태양고도 식). 데이터 상태 "밤"(측정소 지도)과는 별개다. 1분마다 다시 판정한다.
-- 바탕 지도는 `map-theme.mjs`가 `--map-*` 색으로 덮어 칠한다.
-- 지도 구름은 범례와 같은 등급색 한 색이고, 경계는 흐림 처리로 부드러워진다.
+- 바탕 지도는 낮에는 liberty 원래 색이고(글자만 `--map-label`), 밤에만 `map-theme.mjs`가 `--map-*` 색으로 덮어 칠한다.
+- 지도 구름은 낮에는 등급 안에서 농도별로 진해지는 옅은 색(`cloudColor`), 밤에는 범례와 같은 등급색 한 색이고, 경계는 흐림 처리로 부드러워진다.
 - 비교 문장("실측보다 2㎍/㎥ 높아요")은 두 값의 시각 차이가 90분 이하이고 CCTV 지도일 때만 쓴다.
 - 첫 화면 카메라 점은 `shared/cameras.json`에서 격자가 있는 19대, 값 유무는 `/api/frames/latest`의 `camera_ids`.
 

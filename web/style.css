@@ -19,8 +19,8 @@ html:not([data-theme]) body{visibility:hidden}   /* 테마가 정해지기 전�
   --accent:#000000;--accent-on:#FFFFFF;--link:#0062D1;--focus:#000000;--highlight:#000000;
   --cam-dot:#FFFFFF;--cam-edge:#000000;--scrim:rgba(0,0,0,.40);
   --g-good:#2B7BE4;--g-mod:#1E9E5A;--g-bad:#E06F12;--g-vbad:#DE3B40;
-  --map-area:#FFFFFF;--map-water:#F2F3F5;--map-outside:rgba(242,243,245,.9);
-  --map-road:#EEF0F2;--map-road-major:#DFE1E4;--map-building:#F2F3F5;--map-label:#5E6366;--map-label-halo:#FFFFFF;
+  --map-area:#FFFFFF;--map-outside:rgba(242,243,245,.9);
+  --map-label:#5E6366;--map-label-halo:#FFFFFF;
 }
 [data-theme=dark]{
   color-scheme:dark;

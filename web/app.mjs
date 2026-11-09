@@ -5,7 +5,7 @@ import {apiPath,expoLabel} from './expo.mjs';
 import {mountSearch} from './search.mjs';
 import {mountInference} from './infer.mjs';
 import {renderEvidence} from './evidence.mjs';
-import {GRADES,gradeOf,validValue,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
+import {GRADES,gradeOf,cloudColor,validValue,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
 import {cloudImage,veilImage} from './render.mjs';
 import {applyTheme,token} from './theme.mjs';
 import {applyMapTheme} from './map-theme.mjs';
@@ -59,7 +59,7 @@ function ago(t){const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?
  const short=frameStatus(current)?.short;$('top-status').textContent=short?`${short} · ${new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(current.basis_time||current.slot))}`:'';
  renderFrameStatus($('source'),current,current.source==='station'?`${mock&&scenario==='night'?'밤 · ':'밤·결측 대체 · '}측정소에서 잰 값을 이어 그렸어요${mock?' · 예시값':''}`:'CCTV 영상 기반 추정 · 20분 회차 / 1분마다 확인');
 }
-const cloud=()=>cloudImage(grid,current?.values||grid.cells.map(()=>null),layout,GRADES.map(g=>token(g.token)));
+const cloud=()=>{const night=document.documentElement.dataset.theme==='dark',colors=GRADES.map(g=>token(g.token));return cloudImage(grid,current?.values||grid.cells.map(()=>null),layout,v=>night?colors[GRADES.indexOf(gradeOf(v))]:cloudColor(v));};   // 낮은 옅은 농도별 색, 밤은 범례와 같은 등급색
 function draw(){if(map.getSource('cloud'))map.getSource('cloud').updateImage(cloud());}
 // 첫 화면 카메라 점: 그 회차에 값이 있으면 깜빡이고, 없으면 흐리게 멈춘다. 예전 서버 응답(camera_ids 없음)은 지도 출처로 판단
 function syncCameras(){

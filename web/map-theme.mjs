@@ -1,4 +1,4 @@
-// 바탕 지도(OpenFreeMap liberty)를 화면 테마의 무채색으로 덮어 칠한다. 색 값은 style.css의 --map-* 변수에만 있다
+// 밤에는 바탕 지도(OpenFreeMap liberty)를 무채색으로 덮어 칠하고, 낮에는 원래 색 그대로 둔다(글자만 칠한다). 색 값은 style.css의 --map-* 변수에만 있다
 import {token} from './theme.mjs';
 const MAJOR=/motorway|trunk_primary/;
 
@@ -24,8 +24,11 @@ function paints(layer,c){
  return {};
 }
 
+const original=(layer,props)=>Object.fromEntries(Object.keys(props).map(k=>[k,layer.paint?.[k]]));   // 밤에서 낮으로 돌아올 때 원래 값으로 되돌린다
+
 export function applyMapTheme(map,baseLayers){
+ const night=document.documentElement.dataset.theme==='dark';
  const c={area:token('--map-area'),water:token('--map-water'),road:token('--map-road'),major:token('--map-road-major'),building:token('--map-building'),label:token('--map-label'),halo:token('--map-label-halo')};
- for(const layer of baseLayers){if(!map.getLayer(layer.id))continue;for(const [property,value] of Object.entries(paints(layer,c)))map.setPaintProperty(layer.id,property,value);}
+ for(const layer of baseLayers){if(!map.getLayer(layer.id))continue;const p=paints(layer,c);for(const [property,value] of Object.entries(night||layer.type==='symbol'?p:original(layer,p)))map.setPaintProperty(layer.id,property,value);}
  if(map.getLayer('pick')){map.setPaintProperty('pick','circle-color',token('--ink'));map.setPaintProperty('pick','circle-stroke-color',token('--surf'));}
 }
