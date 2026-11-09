@@ -36,7 +36,6 @@ const SCAN_MS=1600,COUNT_MS=55,COUNT_STEPS=18;
 export function mountInference(host,camera,options,onBusy=()=>{}) {
   const live=host.querySelector('.live'),actions=host.querySelector('.actions');
   const button=element('button',options.night?'마지막 낮 사진으로 과정 보기':'지금 찍어서 추정해 보기','infer-button');button.type='button';actions.append(button);
-  const still=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   let disposed=false,controller=null,timers=[],effects=[];
   function clear(){timers.forEach(clearTimeout);timers=[];}
   function clearEffects(){effects.forEach(clearTimeout);effects.forEach(clearInterval);effects=[];}
@@ -59,18 +58,17 @@ export function mountInference(host,camera,options,onBusy=()=>{}) {
   function message(text){clear();status.textContent=text;step(0);photo.replaceChildren(element('p',text,'live-msg'));}
   function scanThen(figure,finish){
     const wrap=figure.querySelector('.camera-photo');figure.classList.add('reveal');photo.replaceChildren(figure);
-    if(still()||!wrap){finish();return;}
+    if(!wrap){finish();return;}
     wrap.append(element('i',null,'scan'));
     effects.push(setTimeout(()=>{wrap.querySelector('.scan')?.remove();finish();},SCAN_MS));
   }
   function showNumber(value,foot){
-    const big=element('div',still()||!validValue(value)?'':'0','live-value'),unit=element('div',null,'live-unit'),note=element('div',null,'live-foot');
+    const big=element('div',validValue(value)?'0':'','live-value'),unit=element('div',null,'live-unit'),note=element('div',null,'live-foot');
     if(!validValue(value)){big.textContent=foot.status||'추정 안 함';big.classList.add('text');side.append(big,note);}
     else{
       const target=Math.round(value),pill=gradePill(value);unit.append('㎍/㎥',pill);side.append(big,unit,note);
       const done=()=>{big.textContent=String(target);pill.classList.remove('waiting');};
-      if(still())done();
-      else{pill.classList.add('waiting');let n=0;const total=Math.max(1,Math.min(target,COUNT_STEPS));const id=setInterval(()=>{n++;big.textContent=String(Math.round(target*n/total));if(n>=total){clearInterval(id);done();}},COUNT_MS);effects.push(id);}
+      pill.classList.add('waiting');let n=0;const total=Math.max(1,Math.min(target,COUNT_STEPS));const id=setInterval(()=>{n++;big.textContent=String(Math.round(target*n/total));if(n>=total){clearInterval(id);done();}},COUNT_MS);effects.push(id);
     }
     foot.lines.forEach(line=>note.append(element('span',line.text,line.strong?'strong':null)));
   }

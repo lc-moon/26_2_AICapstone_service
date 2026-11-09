@@ -160,7 +160,7 @@ function wire(){
  void mountSearch($('place-search'),{base,mock,scenario,inside:p=>inside(p,grid.boundary),onSelect:(p,name,gu)=>{void selectPoint(p,true,{name,gu});if(matchMedia('(max-width:700px)').matches)toggleSearch(false);}});
  $('reset').onclick=home;$('close').onclick=closeAndCenter;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&selection)closeAndCenter();});
  $('view-2d').onclick=()=>setView(true);$('view-3d').onclick=()=>setView(false);
- $('zoom-in').onclick=()=>map.zoomIn({duration:300});$('zoom-out').onclick=()=>map.zoomOut({duration:300});
+ $('zoom-in').onclick=()=>map.zoomIn({duration:300,essential:true});$('zoom-out').onclick=()=>map.zoomOut({duration:300,essential:true});
  $('location').onclick=()=>{if(!navigator.geolocation){notify('이 브라우저에서는 위치를 확인할 수 없어요');return;}navigator.geolocation.getCurrentPosition(pos=>{void selectPoint([pos.coords.longitude,pos.coords.latitude]);const a=pos.coords.accuracy;if(a>500)notify(`PC에서는 위치가 부정확할 수 있어요 (오차 약 ${a>=1000?(a/1000).toFixed(1)+'km':Math.round(a)+'m'})`);},()=>notify('위치를 확인하지 못했어요. 위치 권한을 확인하거나 지도를 눌러 주세요'),{timeout:10000,maximumAge:60000});};
 }
 async function start(){
