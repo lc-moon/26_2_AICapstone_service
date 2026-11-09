@@ -10,7 +10,7 @@ function paints(layer,c){
  if(type==='fill'){
   if(id==='water')return {'fill-color':c.water};
   if(id==='building')return {'fill-color':c.building,'fill-outline-color':c.building};
-  if(id==='road_area_pattern')return {'fill-opacity':0};
+  if(layer.paint?.['fill-pattern'])return {'fill-opacity':0};   // 무늬 칠하기는 색을 바꿀 수 없다
   return {'fill-color':c.area,'fill-opacity':1};
  }
  if(type==='line'){
