@@ -105,7 +105,8 @@ async function getPoint(p){
 }
 async function selectPoint(p,fly=true,placeName=null){
  if(!inside(p,grid.boundary)){notify('CCTV가 없는 곳(영종·강화·섬)은 추정하지 않아요. 인천 내륙과 송도를 눌러 주세요.');return;}
- disposeInference();if(!fly)restoreEvidenceView();clearEvidencePins();selection=p;selectionName=placeName;const request=++pointRequest;$('panel').hidden=false;$('hint').hidden=true;document.body.classList.add('has-selection');
+ disposeInference();if(!fly)restoreEvidenceView();clearEvidencePins();selection=p;selectionName=placeName;const request=++pointRequest;$('panel').hidden=false;$('hint').hidden=true;document.body.classList.add('has-selection');if(!placeName&&fly)$('place-query').value='';   // 지도를 직접 누르면 이전 검색어를 지운다
+ 
  $('details').replaceChildren(text('div','선택한 위치','place'),text('p','농도를 확인하고 있어요'));
  const pending=getPoint(p);pending.catch(()=>{});await mapReady;if(request!==pointRequest)return;
  map.getSource('pick').setData({type:'Feature',properties:{},geometry:{type:'Point',coordinates:p}});
@@ -197,7 +198,8 @@ async function start(){
    cameraDots=cameras.filter(c=>c.grid_id!=null&&Number.isFinite(c.lon)&&Number.isFinite(c.lat)).map((c,i)=>{const element=document.createElement('div');element.className='cam';element.style.setProperty('--d',`${(i*7)%19*.13}s`);new maplibregl.Marker({element,anchor:'center'}).setLngLat([c.lon,c.lat]).addTo(map);return {id:c.camera_id,element};});syncCameras();
    map.on('zoom',syncClose);
    const hadRestored=!!restored;
-   $('hint').textContent='궁금한 곳을 눌러 보세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:restored.padding||{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();mapOk=true;mapLoaded();document.body.classList.add('map-ready');   // 칠하기 전 바탕 지도가 비치지 않게 이때 보여 준다
+   $('hint').textContent='궁금한 곳을 눌러 보세요';if(restored){map.jumpTo({center:restored.center,zoom:restored.zoom,pitch:restored.pitch,bearing:restored.bearing,padding:restored.padding||{top:0,bottom:0,left:0,right:0}});showView(restored.pitch===0);}else if(selection)showView(false);else home();if(homeZoom==null)homeZoom=matchMedia('(max-width:700px)').matches?mobileHome().zoom:fitZoom([126.69,37.475],homePad());syncClose();   // 원리 페이지에서 돌아와 확대된 채로 시작해도 큰 제목이 물러나게
+   mapOk=true;mapLoaded();document.body.classList.add('map-ready');   // 칠하기 전 바탕 지도가 비치지 않게 이때 보여 준다
   
    if(restored?.selection)void selectPoint(restored.selection,false,restored.name);restored=null;   // 지도가 뜨기 전에 이미 고른 곳이 있으면 첫 화면으로 되돌리지 않는다
    if(mock&&params.has('sample')&&!hadRestored&&!selection){void fixture('point_inside').then(sample=>{const cell=grid.cells.find(c=>c.grid_id===sample.grid_id);if(cell)void selectPoint(cell.center);});}

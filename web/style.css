@@ -103,6 +103,7 @@ b,strong{font-weight:500}
 .maplibregl-ctrl-bottom-right{transition:bottom 360ms var(--ease-sheet)}
 .maplibregl-ctrl-bottom-right .maplibregl-ctrl{margin:0 32px 8px 0}
 .has-selection .maplibregl-ctrl-bottom-right{bottom:380px}
+.has-selection .maplibregl-ctrl-bottom-right .maplibregl-ctrl{margin-right:84px}
 .maplibregl-canvas:focus-visible{outline:0}
 
 /* 카메라 점 */

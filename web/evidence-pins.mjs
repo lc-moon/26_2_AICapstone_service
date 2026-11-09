@@ -33,7 +33,6 @@ const css=`
 .ev-edge{position:absolute;pointer-events:auto;cursor:pointer;border:0;background:none;padding:0;transform:translate(-50%,-50%);animation:ev-fade .3s ease both}
 .ev-edge svg{display:block}
 .ev-edge span{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--accent);color:var(--accent-on);border-radius:9999px;padding:4px 9px;font:500 12px/1.2 var(--font);box-shadow:0 0 0 1.5px var(--surf)}
-@media(prefers-reduced-motion:reduce){.ev-head,.ev-ground:before,.ev-detail,.ev-edge{animation:none}}
 @keyframes ev-pulse{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
 @keyframes ev-rise{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 @keyframes ev-fade{from{opacity:0}to{opacity:1}}`;
