@@ -27,7 +27,8 @@
 - 왜: 화면이 "비 때문에 측정소로 보여 줌", "밤이라서", "CCTV 19대 중 17대로 추정"을 한 줄로 띄웁니다. 지금은 측정소 지도면 이유를 구분할 수 없습니다
 - 약속: `shared/mock/next/frames_latest.json`(정상) · `frames_latest_night.json` · `frames_latest_rain.json` · `frames_latest_few.json`. 기존 필드는 그대로, 두 필드만 더합니다
   - `reason`: `"normal"` | `"night"` | `"rain"` | `"humidity"` | `"few_cameras"` | `"no_data"`
-  - `cctv`: `{"valid": 그 회차 화면 범위 카메라 중 값이 있는 수, "total": 화면 범위 카메라 수}` — 화면 범위 = `cameras.grid_id`가 있는 카메라(지금 19대, 103번 강화 제외). 밤이면 `null`
+  - `cctv`: `{"valid": 그 회차 카메라 중 값이 있는 수, "total": 전체 카메라 수}` — #21부터 지도 계산과 같이 103번(강화)도 세어 20대 기준이다. 밤이면 `null`
+  - `camera_ids`: 그 회차에 값이 있는 카메라 id 목록(11/9 추가, 첫 화면 카메라 점 흐림용). 밤이면 `[]`
 - 정하는 법(조회할 때 계산, `frames` 표에 칸을 더하지 않음 — 회차당 estimates가 20행이라 가볍다)
   - CCTV 지도 → `normal`
   - 측정소 지도 + `is_day(slot)`가 false → `night`, `cctv: null`

@@ -466,5 +466,6 @@
  "cctv": {
   "valid": 0,
   "total": 20
- }
+ },
+ "camera_ids": []
 }

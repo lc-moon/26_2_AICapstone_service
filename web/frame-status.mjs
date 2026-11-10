@@ -5,12 +5,14 @@ export function frameStatus(frame){
  const labels={normal:[`CCTV ${total}대 중 ${valid}대 사진으로 추정했어요`,`CCTV ${valid}/${total}대로 추정했어요`],night:['밤이라 측정소에서 잰 값을 보여 드려요','밤 · 측정소에서 잰 값'],rain:['비가 와서 측정소에서 잰 값을 보여 드려요','비 · 측정소에서 잰 값'],humidity:['습도가 높아서(95% 이상) 측정소에서 잰 값을 보여 드려요','습도 높음 · 측정소에서 잰 값'],few_cameras:[`쓸 수 있는 CCTV가 ${total}대 중 ${valid}대뿐이라 측정소에서 잰 값을 보여 드려요`,`CCTV 부족(${valid}/${total}) · 측정소에서 잰 값`],no_data:['CCTV 자료가 없어서 측정소에서 잰 값을 보여 드려요','CCTV 자료 없음 · 측정소에서 잰 값']};
  const pair=labels[frame.reason];return pair?{label:pair[0],short:pair[1],path:paths[frame.reason]}:null;
 }
+export function statusIcon(path){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),line=document.createElementNS(svg.namespaceURI,'path');
+ svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');line.setAttribute('d',path);svg.append(line);return svg;
+}
 export function renderFrameStatus(host,frame,fallback){
  const state=frameStatus(frame);if(!state){delete host.dataset.reason;host.textContent=fallback;return;}
  host.dataset.reason=frame.reason;
- const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),path=document.createElementNS(svg.namespaceURI,'path');
- svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');path.setAttribute('d',state.path);svg.append(path);
- host.replaceChildren(svg,element('span',state.label,'source-full'),element('span',state.short,'source-short'));
+ host.replaceChildren(statusIcon(state.path),element('span',state.label,'source-full'),element('span',state.short,'source-short'));
 }
 // 측정소 지도일 때 접속하면 한 번 알리는 안내창. 이유는 원리 페이지의 "뺀 사진"과 같은 내용만 쓴다
 const VALUE_NOTE='지금 지도는 측정소에서 잰 실제 값이에요.';
@@ -36,7 +38,7 @@ export function mountNotice(host){
   const notice=noticeFor(frame);
   if(!notice){write(null);host.hidden=true;return;}
   if(!host.hidden||busy||read()===frame.reason)return;   // 같은 상태는 탭에서 한 번만, 지점을 보는 중이면 미룬다
-  host.dataset.reason=frame.reason;host.querySelector('h2').textContent=notice.title;host.querySelector('p').textContent=notice.body;
+  host.dataset.reason=frame.reason;host.querySelector('h2').textContent=notice.title;host.querySelector('p').textContent=notice.body;host.querySelector('.notice-icon').replaceChildren(statusIcon(frameStatus(frame).path));
   host.hidden=false;host.querySelector('.notice-ok').focus();
  };
 }

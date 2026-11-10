@@ -1,19 +1,25 @@
 const GRADES = [
-  { max: 15, name: "좋음",     range: "0–15",  light: [200, 226, 252], dark: [128, 176, 236] },
-  { max: 35, name: "보통",     range: "16–35", light: [196, 234, 196], dark: [118, 196, 140] },
-  { max: 75, name: "나쁨",     range: "36–75", light: [255, 226, 165], dark: [244, 176, 100] },
-  { max: 150, name: "매우나쁨", range: "76~",   light: [246, 170, 170], dark: [214, 100, 112] },
+  { max: 15, name: "좋음",     range: "0–15",  token: "--g-good", pale: [200, 226, 252], deep: [128, 176, 236] },
+  { max: 35, name: "보통",     range: "16–35", token: "--g-mod", pale: [196, 234, 196], deep: [118, 196, 140] },
+  { max: 75, name: "나쁨",     range: "36–75", token: "--g-bad", pale: [255, 226, 165], deep: [244, 176, 100] },
+  { max: 150, name: "매우나쁨", range: "76~",   token: "--g-vbad", pale: [246, 170, 170], deep: [214, 100, 112] },
 ];
 const gradeOf = v => GRADES.find(g => Math.round(v) <= g.max) || GRADES[3];
-function colorOf(v) {
-  const i = GRADES.indexOf(gradeOf(v)), g = GRADES[i];
-  const lo = i ? GRADES[i - 1].max : 0, t = Math.min(1, Math.max(0, (v - lo) / (g.max - lo)));
-  return g.light.map((x, k) => Math.round(x + (g.dark[k] - x) * t));
+// 등급 눈금 위 위치(%). 낮은 농도가 몰려 있어 등급마다 같은 폭(4분의 1)으로 그린다
+function gaugePos(v) {
+  const x = Math.min(150, Math.max(0, Math.round(v)));
+  const i = GRADES.findIndex(g => x <= g.max), lo = i ? GRADES[i - 1].max : 0;
+  return (i + (x - lo) / (GRADES[i].max - lo)) * 25;
 }
-const rgb = c => `rgb(${c.join(",")})`;
 
+// 낮 지도 구름색: 범례의 등급색보다 옅고, 등급 안에서 농도가 높을수록 진해진다
+function cloudColor(v) {
+  const i = GRADES.indexOf(gradeOf(v)), g = GRADES[i], lo = i ? GRADES[i - 1].max : 0;
+  const t = Math.min(1, Math.max(0, (v - lo) / (g.max - lo)));
+  return `rgb(${g.pale.map((x, k) => Math.round(x + (g.deep[k] - x) * t)).join(",")})`;
+}
 
-export { GRADES, gradeOf, colorOf, rgb };
+export { GRADES, gradeOf, gaugePos, cloudColor };
 export const validValue = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 export function inRing(p, r) {
   let inside = false;

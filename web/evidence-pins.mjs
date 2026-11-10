@@ -4,35 +4,35 @@
 // - 실제로 가리는 것(패널·카드·버튼)에 가려지거나 화면 밖이면 가장자리 방향 핀
 // - 핀을 누르면 선택한 곳은 화면 같은 자리에 둔 채, 목표가 보일 만큼만 물러난다. 다시 누르거나 ×면 원래 시점으로
 // - &line=1 이면 선택한 곳과 잇는 옅은 선(비교용)
-import {gradeOf,validValue,rgb,formatTime} from './core.mjs';
-import {cameraFigure,element} from './evidence.mjs';
+import {validValue,formatTime} from './core.mjs';
+import {cameraFigure,element,gradePill} from './evidence.mjs';
+import {token} from './theme.mjs';
 let targets=[],overlay=null,raf=0,mapRef=null,saved=null,active=null,ctx={},dimmed=false,measuring=false;
 const baseOpacity=new Map();
 const empty={type:'FeatureCollection',features:[]};
 const ICON={
  station:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 17c2-3 4-3 6 0s4 3 6 0 3-2 4-1"/><path d="M4 10c2-3 4-3 6 0s4 3 6 0 3-2 4-1"/></svg>',
  cctv:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l13 4-2 5L2 12z"/><path d="M16 11l4-1v5l-5-1"/><path d="M6 13v5H3"/></svg>'};
-const COLOR={station:'#1d5c8f',cctv:'#c8323b'},NAME={station:'측정소',cctv:'CCTV'};
+const NAME={station:'측정소',cctv:'CCTV'};   // 파랑·빨강은 등급색이라 핀은 무채색으로 두고 아이콘과 이름으로 구분한다
 const css=`
 .ev-pin{position:relative;width:0;height:0}
-.ev-head{position:absolute;left:0;margin-left:var(--dx,0px);bottom:30px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border:0;padding:4px 12px 4px 4px;border-radius:22px;background:var(--c);color:#fff;font:700 13px/1 system-ui;white-space:nowrap;cursor:pointer;box-shadow:0 0 0 2.5px #fff,0 6px 16px #0c2a2e66;animation:ev-rise .45s cubic-bezier(.2,.9,.3,1.3) both}
-.ev-head i{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#fff;color:var(--c)}
-.ev-head:hover{filter:brightness(1.08)}.ev-pin.on .ev-head{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--c),0 6px 16px #0c2a2e66}
-.ev-stem{position:absolute;left:-1.5px;bottom:2px;width:3px;height:30px;background:linear-gradient(var(--c),#fff0);border-radius:2px}
-.ev-ground{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:var(--c);border:2px solid #fff;box-sizing:border-box}
-.ev-ground:before{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--c);animation:ev-pulse 2s ease-out infinite}
-.ev-detail{position:absolute;left:0;bottom:78px;transform:translateX(-50%);background:#fff;border-radius:12px;padding:12px 14px;width:228px;box-shadow:0 10px 30px #0c2a2e40;text-align:left;cursor:default;animation:ev-fade .3s ease both;z-index:3}
-.ev-detail .k{font-size:10px;letter-spacing:1px;font-weight:700}.ev-detail .n{font-size:14px;font-weight:700;margin:2px 0 6px;color:#1f3437}
-.ev-detail .v{font-size:22px;font-weight:700;color:#1f3437;letter-spacing:-.5px}.ev-detail .v small{font-size:11px;font-weight:400;margin-left:3px}
-.ev-detail .g{display:inline-block;font-size:11px;border-radius:12px;padding:2px 8px;margin-left:6px;vertical-align:4px;color:#1f3437;letter-spacing:0}
-.ev-detail .t{font-size:11px;color:#687b7e;margin-top:4px}
+.ev-head{position:absolute;left:0;margin-left:var(--dx,0px);bottom:30px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border:0;padding:4px 12px 4px 4px;border-radius:9999px;background:var(--accent);color:var(--accent-on);font:500 13px/1 var(--font);white-space:nowrap;cursor:pointer;box-shadow:0 0 0 1.5px var(--surf);animation:ev-rise .45s cubic-bezier(.2,.9,.3,1.3) both}
+.ev-head i{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent-on);color:var(--accent)}
+.ev-pin.on .ev-head{box-shadow:0 0 0 2px var(--surf),0 0 0 4px var(--accent)}
+.ev-stem{position:absolute;left:-1.5px;bottom:2px;width:3px;height:30px;background:linear-gradient(var(--accent),transparent);border-radius:2px}
+.ev-ground{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--surf);box-sizing:border-box}
+.ev-ground:before{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--accent);animation:ev-pulse 2s ease-out infinite}
+.ev-detail{position:absolute;left:0;bottom:78px;transform:translateX(-50%);background:var(--surf);color:var(--ink);font-family:var(--font);border:1px solid var(--line-strong);border-radius:12px;padding:12px 14px;width:244px;text-align:left;cursor:default;animation:ev-fade .3s ease both;z-index:3}
+.ev-detail .k{font-size:12px;color:var(--sub)}.ev-detail .n{font-size:15px;font-weight:500;margin:2px 0 8px}
+.ev-detail .v{display:flex;align-items:baseline;gap:6px;font-size:28px;letter-spacing:-.5px;margin-top:6px}.ev-detail .v small{font-size:12px;letter-spacing:0;color:var(--sub)}.ev-detail .grade-pill{margin-left:auto;letter-spacing:0}
+.ev-detail .t{font-size:12px;line-height:17px;color:var(--sub);margin-top:6px}
+.ev-detail .photo-chip{display:none}
 .ev-detail img{display:block;width:100%;height:auto;border-radius:6px;margin:6px 0 2px}
-.ev-detail .x{position:absolute;top:6px;right:8px;border:0;background:none;font-size:16px;color:#687b7e;cursor:pointer}
+.ev-detail .x{position:absolute;top:6px;right:8px;border:0;background:none;font-size:14px;color:var(--sub);cursor:pointer}
 .ev-edges{position:absolute;inset:0;pointer-events:none;z-index:2}
 .ev-edge{position:absolute;pointer-events:auto;cursor:pointer;border:0;background:none;padding:0;transform:translate(-50%,-50%);animation:ev-fade .3s ease both}
-.ev-edge svg{display:block;filter:drop-shadow(0 3px 6px #0c2a2e66)}
-.ev-edge span{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--c);color:#fff;border-radius:12px;padding:4px 9px;font:700 12px/1.2 system-ui;box-shadow:0 0 0 2px #fff,0 3px 10px #0c2a2e44}
-@media(prefers-reduced-motion:reduce){.ev-head,.ev-ground:before,.ev-detail,.ev-edge{animation:none}}
+.ev-edge svg{display:block}
+.ev-edge span{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--accent);color:var(--accent-on);border-radius:9999px;padding:4px 9px;font:500 12px/1.2 var(--font);box-shadow:0 0 0 1.5px var(--surf)}
 @keyframes ev-pulse{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
 @keyframes ev-rise{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 @keyframes ev-fade{from{opacity:0}to{opacity:1}}`;
@@ -46,7 +46,7 @@ export function initEvidencePins(map,options){
   map.on('move',()=>{if(measuring)return;cancelAnimationFrame(raf);raf=requestAnimationFrame(updateEdges);});
   addEventListener('resize',()=>updateEdges());
   const observer=new ResizeObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(updateEdges);});
-  ['panel','title','place-search','legend'].forEach(id=>{const e=document.getElementById(id);if(e)observer.observe(e);});
+  ['panel','title','legend'].forEach(id=>{const e=document.getElementById(id);if(e)observer.observe(e);});
 }
 
 // 선택 중에는 지도의 장소 아이콘·글자를 흐리게(근거 핀이 묻히지 않게)
@@ -65,7 +65,7 @@ export function restoreEvidenceView(){if(saved)mapRef.easeTo({...saved,duration:
 
 function links(){
   const list=active?[active]:[];
-  mapRef.getSource('ev-link').setData({type:'FeatureCollection',features:list.map(t=>({type:'Feature',properties:{color:COLOR[t.type]},geometry:{type:'LineString',coordinates:[t.point,t.at]}}))});
+  mapRef.getSource('ev-link').setData({type:'FeatureCollection',features:list.map(t=>({type:'Feature',properties:{color:token('--ink')},geometry:{type:'LineString',coordinates:[t.point,t.at]}}))});
 }
 
 export function showEvidencePins(map,point,data){
@@ -75,7 +75,7 @@ export function showEvidencePins(map,point,data){
       targets.push({type,at:[info.lon,info.lat],km:info.distance_km,info});
   }
   for(const t of targets){
-    const el=document.createElement('div');el.className='ev-pin';el.style.setProperty('--c',COLOR[t.type]);
+    const el=document.createElement('div');el.className='ev-pin';
     el.innerHTML=`<i class="ev-stem"></i><i class="ev-ground"></i><button type="button" class="ev-head"><i>${ICON[t.type]}</i>${NAME[t.type]}</button>`;
     el.querySelector('.ev-head').onclick=e=>{e.stopPropagation();toggle(t);};
     t.el=el;t.point=point;
@@ -88,8 +88,8 @@ export function showEvidencePins(map,point,data){
 // 실제로 화면을 가리는 것들(지도 기준 좌표)
 function blockers(){
   const c=mapRef.getContainer().getBoundingClientRect();
-  return ['#panel','#title','#search-toggle','#place-search','#legend','#status','.tools','.maplibregl-ctrl-top-right','#toast']
-    .map(s=>document.querySelector(s)).filter(e=>e&&!e.hidden&&e.getClientRects().length>0)
+  return ['#panel','#topbar','#title','#legend','#status','.tools','#toast']
+    .map(s=>document.querySelector(s)).filter(e=>e&&!e.hidden&&e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden')
     .map(e=>{const r=e.getBoundingClientRect();return {l:r.left-c.left-8,t:r.top-c.top-8,r:r.right-c.left+8,b:r.bottom-c.top+8};});
 }
 function free(x,y,B,m=24,pad=0){
@@ -127,9 +127,9 @@ function updateEdges(){
     const e=edges.find(x=>x.t===t);
     if(!e){if(t.edge)t.edge.hidden=true;continue;}
     if(!t.edge){
-      const b=document.createElement('button');b.type='button';b.className='ev-edge';b.style.setProperty('--c',COLOR[t.type]);
+      const b=document.createElement('button');b.type='button';b.className='ev-edge';
       b.title=`${NAME[t.type]} 위치 보기`;b.setAttribute('aria-label',`${NAME[t.type]} 위치 보기`);
-      b.innerHTML=`<svg width="34" height="43" viewBox="0 0 30 38"><path d="M15 37C9 27 1 21 1 14a14 14 0 0 1 28 0c0 7-8 13-14 23z" fill="${COLOR[t.type]}" stroke="#fff" stroke-width="1.8"/><circle cx="15" cy="14" r="6" fill="#fff"/></svg><span></span>`;
+      b.innerHTML=`<svg width="34" height="43" viewBox="0 0 30 38"><path d="M15 37C9 27 1 21 1 14a14 14 0 0 1 28 0c0 7-8 13-14 23z" style="fill:var(--accent);stroke:var(--surf)" stroke-width="1.8"/><circle cx="15" cy="14" r="6" style="fill:var(--accent-on)"/></svg><span></span>`;
       b.querySelector('span').textContent=`${NAME[t.type]} ${Number.isFinite(t.km)?t.km.toFixed(1)+'km':''}`;
       b.onclick=ev=>{ev.stopPropagation();toggle(t);};
       overlay.append(b);t.edge=b;
@@ -143,10 +143,10 @@ function updateEdges(){
 function detail(t){
   const box=document.createElement('div');box.className='ev-detail';box.onclick=e=>e.stopPropagation();
   const x=Object.assign(document.createElement('button'),{className:'x',textContent:'×',type:'button',title:'선택한 곳으로'});x.onclick=e=>{e.stopPropagation();toggle(t);};
-  const k=Object.assign(document.createElement('div'),{className:'k',textContent:t.type==='station'?'가까운 측정소 · 실측':'가까운 CCTV · 추정에 쓴 사진'});k.style.color=COLOR[t.type];
+  const k=Object.assign(document.createElement('div'),{className:'k',textContent:t.type==='station'?'가까운 측정소 · 실측':'가까운 CCTV · 추정에 쓴 사진'});
   box.append(x,k,Object.assign(document.createElement('div'),{className:'n',textContent:t.info.name}));
   if(t.type==='cctv')box.append(cameraFigure(t.info,ctx));
-  if(validValue(t.info.pm25)){const g=gradeOf(t.info.pm25),v=document.createElement('div');v.className='v';v.innerHTML=`${Math.round(t.info.pm25)}<small>㎍/㎥</small><span class="g"></span>`;v.querySelector('.g').textContent=g.name;v.querySelector('.g').style.background=rgb(g.light);box.append(v);}
+  if(validValue(t.info.pm25)){const v=document.createElement('div');v.className='v';v.innerHTML=`${Math.round(t.info.pm25)}<small>㎍/㎥</small>`;v.append(gradePill(t.info.pm25));box.append(v);}
   if(!validValue(t.info.pm25))box.append(element('p',t.info.status||'값 없음'));
   const when=t.type==='station'?`${formatTime(t.info.data_time)} 기준 · ${t.info.period||''}`:t.info.captured_at?`${formatTime(t.info.captured_at)} 촬영`:'최근 낮 회차 사진';
   box.append(Object.assign(document.createElement('div'),{className:'t',textContent:`${when} · 선택한 곳에서 ${Number.isFinite(t.km)?t.km.toFixed(1)+'km':''}`}));

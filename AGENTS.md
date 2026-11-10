@@ -61,7 +61,7 @@ S1~S10(측정소 실측·밤 지도·근거 패널·직접 해보기·원리 페
 | 주소 | 용도 | 응답 요약 |
 |---|---|---|
 | `GET /api/grid` | 격자·경계 (처음 한 번) | `cells[]`(grid_id, row, col, center, gu), `boundary`. cells 순서 = values 순서 |
-| `GET /api/frames/latest` | 최신 농도 | `slot`, `source`(cctv/station), `basis_time`(측정소 지도일 때 쓴 실측 시각), `values[]`, `updated_at`. **만드는 중(F13)**: `reason`, `cctv` (`shared/mock/next/`) |
+| `GET /api/frames/latest` | 최신 농도 | `slot`, `source`(cctv/station), `basis_time`(측정소 지도일 때 쓴 실측 시각), `values[]`, `updated_at`. **만드는 중(F13)**: `reason`, `cctv` (`shared/mock/next/`) `camera_ids`(그 회차에 값이 있는 카메라 id, 첫 화면 점 흐림용) |
 | `GET /api/point?lon=&lat=` | 클릭한 곳 | `inside`, `gu`, `estimate`(pm25, grade, slot), `station`(name, distance_km, pm25, period), `camera`(가까운 CCTV: camera_id, name, distance_km, slot, captured_at, pm25, status, photo_url). 범위 밖은 `inside:false`만. **만드는 중(F14)**: `camera`·`station`에 `lon`, `lat`, `nearest`(건너뛴 곳과 이유) (`shared/mock/next/`) |
 | `POST /api/infer?camera_id=` | 직접 해보기 | 그 카메라를 **지금** 찍어 추정: `captured_at`, `pm25`, `grade`, `status`, `photo_url`, `cached`, `elapsed_s`. 진행 중이면 409 |
 | `?source=cctv` | 전시용 (마지막) | `/api/frames/latest`와 `/api/point`에 붙이면 가장 최근 **CCTV** 회차 기준으로 답함(밤에도 낮 회차) |

@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {gradeOf,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
+import {gradeOf,cloudColor,inside,gridLayout,cellAt,validateFrame,frameChanged,formatTime} from './core.mjs';
 const read=n=>JSON.parse(readFileSync(new URL('../shared/mock/'+n+'.json',import.meta.url)));
 const grid=read('grid'),day=read('frames_latest'),night=read('frames_latest_night');
 test('grid cells and both fixtures obey the response contract',()=>{assert.equal(grid.cells.length,grid.count);for(const f of [day,night])assert.equal(validateFrame(f,grid.count),f);});
 test('round before grading at every threshold',()=>{for(const [v,g] of [[15.49,'좋음'],[15.5,'보통'],[35.49,'보통'],[35.5,'나쁨'],[75.49,'나쁨'],[75.5,'매우나쁨']])assert.equal(gradeOf(v).name,g);});
+test('daytime cloud color deepens with value inside a grade',()=>{assert.equal(cloudColor(0),'rgb(200,226,252)');assert.equal(cloudColor(14),'rgb(133,179,237)');assert.equal(cloudColor(15),'rgb(128,176,236)');assert.equal(cloudColor(16),'rgb(192,232,193)');});
 test('all cell centers map back to their API array index',()=>{const layout=gridLayout(grid.cells);grid.cells.forEach((c,i)=>assert.equal(cellAt(c.center,grid.cells,layout),i));});
 test('polygon holes and outside locations excluded',()=>{const g={type:'Polygon',coordinates:[[[0,0],[5,0],[5,5],[0,5],[0,0]],[[1,1],[2,1],[2,2],[1,2],[1,1]]]};assert(inside([3,3],g));assert(!inside([1.5,1.5],g));assert(!inside([6,6],g));assert(!inside([127,37.5],grid.boundary));});
 test('same slot updated_at change triggers repaint',()=>{assert(!frameChanged(day,{...day}));assert(frameChanged(day,{...day,updated_at:'2026-10-16T13:35:00+09:00'}));assert(frameChanged(day,night));});
@@ -16,3 +17,4 @@ test('F27 advice follows grade boundaries and stays empty for missing values',as
  assert.match(adviceFor(15),/제약 없음/);assert.equal(adviceFor(null),'');
  assert.match(adviceFor(16),/민감군/);assert.match(adviceFor(36),/KF80/);assert.match(adviceFor(76),/KF94/);
 });
+test('gauge gives each grade a quarter of the bar',async()=>{const {gaugePos}=await import('./core.mjs');for(const [v,p] of [[0,0],[15,25],[16,26.25],[35,50],[36,50.625],[75,75],[150,100],[400,100]])assert.ok(Math.abs(gaugePos(v)-p)<1e-9,String(v));assert.ok(Math.abs(gaugePos(76)-75.333)<.01);assert.equal(gaugePos(15.4),25);});
