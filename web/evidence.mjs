@@ -62,12 +62,37 @@ export function clockOf(time,reference) {
   return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(time));
 }
 
+function countNumber(tag,value) {
+  const node=element(tag,String(Math.round(value)));
+  node.dataset.count=node.textContent;
+  return node;
+}
+
+// 지점을 새로 고를 때만: 숫자는 0부터 올리고, 게이지 점과 이름표는 왼쪽 끝에서 제자리로 민다
+const REVEAL_MS=900;
+function reveal(host) {
+  const counts=[...host.querySelectorAll('[data-count]')].map(node=>({node,to:Number(node.dataset.count)}));
+  const marks=[...host.querySelectorAll('.gauge-dot,.gauge-tag')].map(node=>({node,to:parseFloat(node.style.left)}));
+  for(const c of counts)c.node.style.minWidth=`${c.node.getBoundingClientRect().width}px`;   // 자릿수가 늘어도 옆 글자가 밀리지 않게
+  host.setAttribute('aria-busy','true');   // 올라가는 숫자를 화면 읽기 프로그램이 하나씩 읽지 않게
+  const start=performance.now();
+  const draw=now=>{
+    const t=Math.min(1,Math.max(0,(now-start)/REVEAL_MS)),eased=1-(1-t)**3;
+    for(const c of counts)c.node.textContent=String(Math.round(c.to*eased));
+    for(const m of marks)m.node.style.left=`${m.to*eased}%`;
+    if(t<1){requestAnimationFrame(draw);return;}
+    for(const c of counts)c.node.style.minWidth='';
+    host.removeAttribute('aria-busy');
+  };
+  draw(start);
+}
+
 function numberCard(data,options) {
   const e=data.estimate,card=element('section',null,'dock-card num-card evidence-section'),head=element('div',null,'num-head');
   head.append(element('h2',panelTitle(options.placeName,options.placeGu||data.gu),'place'));
   if(validValue(e?.pm25))head.append(gradePill(e.pm25));
   const value=element('div',null,'value');
-  if(validValue(e?.pm25))value.append(String(Math.round(e.pm25)),element('small','㎍/㎥'));else{value.textContent='값 없음';value.classList.add('empty');}
+  if(validValue(e?.pm25))value.append(countNumber('span',e.pm25),element('small','㎍/㎥'));else{value.textContent='값 없음';value.classList.add('empty');}
   const foot=element('div',null,'num-foot'),source=element('p');
   source.append(element('b',e?.source==='station'?'측정소 실측':'CCTV 추정'),` · ${formatTime(e?.slot)} 기준`);
   foot.append(source,element('p',e?.source==='station'?'측정소에서 잰 값을 이어 그렸어요':'CCTV 사진들로 추정한 값을 이어 그렸어요'));
@@ -83,7 +108,7 @@ function numberCard(data,options) {
 
 function valueBlock(label,value) {
   const block=element('div',null,'cmp-value');
-  block.append(element('span',label),element('b',validValue(value)?String(Math.round(value)):'값 없음',validValue(value)?null:'empty'));
+  block.append(element('span',label),validValue(value)?countNumber('b',value):element('b','값 없음','empty'));
   return block;
 }
 
@@ -164,4 +189,5 @@ export function renderEvidence(host,data,options={}) {
   else if(options.notice)grid.append(noticeStage(options));
   else grid.classList.add('no-stage');
   host.replaceChildren(grid);
+  if(options.reveal)reveal(host);
 }

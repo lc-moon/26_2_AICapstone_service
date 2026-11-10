@@ -87,11 +87,11 @@ async function refresh(){
  finally{busy=false;showStatus();}
 }
 function text(tag,content,cls){const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el;}
-function displayPoint(data){
+function displayPoint(data,reveal=false){
  if(!expo&&data.estimate?.source==='station')data={...data,camera:null};   // 측정소 지도(밤·비·습도·카메라 부족)의 농도에는 CCTV 사진이 쓰이지 않는다
  const e=data.estimate?.pm25;$('panel').style.setProperty('--glow',validValue(e)?`var(${gradeOf(e).token})`:'transparent');
  const n=!data.camera&&data.estimate?.source==='station'?noticeFor(current):null,state=n&&frameStatus(current);
- renderEvidence($('details'),data,{mock,base,placeName:selectionName?.name,placeGu:selectionName?.gu,notice:n&&{...n,icon:state?statusIcon(state.path):null}});
+ renderEvidence($('details'),data,{mock,base,reveal,placeName:selectionName?.name,placeGu:selectionName?.gu,notice:n&&{...n,icon:state?statusIcon(state.path):null}});
  showEvidencePins(map,selection,data);
  if(expo&&data.estimate?.source!=='cctv')$('details').querySelector('.num-foot')?.prepend(text('p','전시용 CCTV 상세 미지원 · 응답에 표시된 기준 시각과 출처를 확인해 주세요.','expo-note'));
  if(data.camera)disposeInference=mountInference($('details').querySelector('.evidence-camera'),data.camera,{mock,base,scenario,expo,night:expo&&liveNight},value=>{inferenceBusy=value;});
@@ -113,7 +113,7 @@ async function selectPoint(p,fly=true,placeName=null){
  document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');if(fly)map.flyTo({center:p,zoom:15.4,pitch:60,duration:motion,essential:true,padding:panelPad(true)});
  try{const data=await pending;if(request!==pointRequest)return;
   if(!data){$('details').replaceChildren(text('div','상세 정보 준비 중','place'),text('p','지점 상세 API가 아직 제공되지 않습니다. 지도에서는 최신 격자 분포를 확인할 수 있습니다.'));return;}
-  if(!data.inside){$('details').replaceChildren(text('p','CCTV가 없는 곳(영종·강화·섬)은 추정하지 않아요. 인천 내륙과 송도를 눌러 주세요.'));return;}displayPoint(data);if(fly)settle();
+  if(!data.inside){$('details').replaceChildren(text('p','CCTV가 없는 곳(영종·강화·섬)은 추정하지 않아요. 인천 내륙과 송도를 눌러 주세요.'));return;}displayPoint(data,fly);if(fly)settle();
  }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도를 다시 눌러 주세요'));}
 }
 function closePanel(){disposeInference();clearEvidencePins();selection=null;selectionName=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;document.body.classList.remove('has-selection');map?.getSource('pick')?.setData(empty);}
