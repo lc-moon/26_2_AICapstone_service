@@ -1,5 +1,6 @@
 /* 인천 에어맵 디자인 변수 — 색·글자·움직임은 여기 한곳에서 바꾼다. 기준: _local/리디자인_시안/DESIGN.md (Resend 결 + Pretendard + 등급색 빛 번짐) */
-@font-face{font-family:'Pretendard Variable';src:url('fonts/PretendardVariable.woff2') format('woff2');font-weight:45 920;font-display:swap}
+/* 글꼴은 jsDelivr의 Pretendard 분할본: 쓰는 글자 조각만 받는다(통짜 2MB를 서버에서 주면 느린 회선에서 화면 파일이 밀려 첫 로딩이 실패했다, 11/10) */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 @property --glow{syntax:'<color>';inherits:true;initial-value:transparent}
 
 :root{

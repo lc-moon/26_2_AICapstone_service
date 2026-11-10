@@ -25,7 +25,7 @@ python3 -m http.server 8766 --bind 127.0.0.1
 
 ## 디자인 (11/9 리디자인)
 
-- 색·글자·간격·움직임 변수는 `style.css` 맨 위 한곳에 있다. 글꼴은 `fonts/PretendardVariable.woff2`(SIL OFL)를 직접 제공한다.
+- 색·글자·간격·움직임 변수는 `style.css` 맨 위 한곳에 있다. 글꼴은 Pretendard(SIL OFL) 분할본을 jsDelivr에서 받는다(`style.css` 맨 위 `@import`). 못 받으면 맑은 고딕으로 보인다.
 - 일몰 후에는 다크(`theme.mjs`, 서버 `sun.py`와 같은 태양고도 식). 데이터 상태 "밤"(측정소 지도)과는 별개다. 1분마다 다시 판정한다.
 - 지점을 새로 고르면 패널 숫자는 0부터 올라가고 게이지 점은 왼쪽 끝에서 제자리로 간다(`evidence.mjs`의 `reveal`). 1분 갱신으로 다시 그릴 때는 움직이지 않는다.
 - 바탕 지도는 낮에는 liberty 원래 색이고(글자만 `--map-label`), 밤에만 `map-theme.mjs`가 `--map-*` 색으로 덮어 칠한다.
