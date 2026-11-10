@@ -12,7 +12,7 @@
 <ul><li><strong>사진</strong>: 인천 도로 CCTV 20대, 20분마다 1장, 해가 떠 있을 때만 (2026-09-21부터 수집 중)</li><li><strong>정답</strong>: 카메라에서 가장 가까운 에어코리아 측정소(0.4~4km)의 1시간 평균 PM2.5</li><li><strong>날씨</strong>: 기상청 1분 습도·강수량</li><li><strong>뺀 사진</strong>: 비 오는 사진, 습도 95% 이상(짙은 안개·물방울), 카메라가 돌아가 화면이 바뀐 사진</li><li><strong>나눈 방법</strong>: 9/22~10/19(28일, 15,721장)로 배우고, <strong>모델이 한 번도 보지 않은 10/20~11/1(13일, 6,852장)으로 채점</strong>했습니다. 후보를 고르는 것은 배우는 기간 안의 연습시험으로 하고, 채점 기간은 고른 뒤에만 열었습니다</li></ul>
 </section>
 <section id="section-4"><h2><span>04</span> 방법</h2>
-<figure><img src="about/img/1_roi.png" alt="같은 카메라의 맑은 날과 탁한 날" loading="lazy">
+<figure><img src="about/img/1_roi.webp" alt="같은 카메라의 맑은 날과 탁한 날" loading="lazy">
 <figcaption>같은 카메라의 맑은 날과 탁한 날. 노란 점선 위쪽만 모델이 봅니다</figcaption></figure>
 <ol><li><strong>사진의 위쪽 60%만 봅니다.</strong> 아래쪽은 도로와 차라서, 먼지와 상관없이 매번 바뀝니다. 사람이 카메라마다 그린 상자(하늘, 먼 건물·산)와 사진 전체도 비교했는데, 아래 40%만 잘라 낸 쪽이 가장 잘 맞혔습니다(차이는 작습니다)</li><li><strong>사진 인식 모델을 다시 가르칩니다.</strong> 수많은 사진으로 미리 배운 이미지 모델(ConvNeXt V2-Tiny)에 우리 CCTV 사진과 정답을 보여 주며, &quot;이렇게 보이면 몇 ㎍/㎥&quot;를 배우게 했습니다</li><li><strong>습도를 함께 알려 줍니다.</strong> 습한 날에는 공기 중 물방울 때문에 먼지가 적어도 화면이 뿌옇습니다. 모델에 습도 숫자 하나를 같이 넣어, &quot;습해서 뿌연 몫&quot;을 스스로 덜어 내게 했습니다</li><li>화면 위 시각·지명 글자는 모델이 보지 못하게 가립니다</li></ol>
 </section>
@@ -23,7 +23,7 @@
 <figure><img src="about/img/3_humidity.png" alt="습도별로 얼마나 높게·낮게 불렀나" loading="lazy">
 </figure>
 <ul><li>처음 모델은 습할수록 높게 불렀습니다(습도 85~95%에서 평균 +4.2). 뿌연 화면을 먼지로 착각한 것입니다</li><li>더 많은 날(28일)을 배우자 이 버릇이 크게 줄었고, 습도를 함께 넣자 가장 습한 구간에서 한 번 더 줄었습니다(+1.1 → +0.5)</li></ul>
-<figure><img src="about/img/4_gradcam.png" alt="위: 원래 사진, 아래: 모델이 본 곳" loading="lazy">
+<figure><img src="about/img/4_gradcam.webp" alt="위: 원래 사진, 아래: 모델이 본 곳" loading="lazy">
 <figcaption>위: 원래 사진, 아래: 모델이 본 곳 (빨강일수록 많이 봄). 카메라 20대 중 한 대입니다 — 탁한 날에는 대부분의 카메라가 이렇게 먼 곳을 봅니다</figcaption></figure>
 <ul><li><strong>탁한 날, 모델은 지평선과 먼 건물을 봅니다.</strong> 가설(먼 곳의 흐림)과 같은 곳입니다</li><li>맑은 날에는 시선이 흩어집니다. 이 그림은 사진마다 가장 많이 본 곳을 빨강으로 맞추기 때문에, 단서가 약한 맑은 날은 여기저기 옅게 칠해집니다</li></ul>
 <figure><img id="comparison-image" src="about/img/5_compare.png" alt="실제 서비스의 날짜별 추정값과 측정소 실측 대조" hidden><div id="comparison-placeholder" class="figure-placeholder">실측 대조 그림 준비 중</div><figcaption>실제 서비스가 매일 낸 추정값과 측정소 실측</figcaption></figure>
