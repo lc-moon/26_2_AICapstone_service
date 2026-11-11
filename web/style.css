@@ -20,6 +20,7 @@ html:not([data-theme]) body{visibility:hidden}   /* 테마가 정해지기 전�
   --accent:#000000;--accent-on:#FFFFFF;--link:#0062D1;--focus:#000000;--highlight:#000000;
   --cam-dot:#FFFFFF;--cam-edge:#000000;--scrim:rgba(0,0,0,.40);
   --g-good:#2B7BE4;--g-mod:#1E9E5A;--g-bad:#E06F12;--g-vbad:#DE3B40;
+  --viz-main:#2B7BE4;--viz-mid:#A9CBF5;--viz-warn:#F08A3C;--viz-muted:#D9DCE1;--viz-muted-2:#B4B9C1;   /* 원리 페이지 그래프: 최종·중간·처음 모델·비교 대상 */
   --map-area:#FFFFFF;--map-outside:rgba(242,243,245,.9);
   --map-label:#5E6366;--map-label-halo:#FFFFFF;
 }
@@ -31,6 +32,7 @@ html:not([data-theme]) body{visibility:hidden}   /* 테마가 정해지기 전�
   --accent:#FFFFFF;--accent-on:#000000;--link:#F0F0F0;--focus:#FFFFFF;--highlight:#FFFFFF;
   --cam-dot:#000000;--cam-edge:#F0F0F0;--scrim:rgba(0,0,0,.72);
   --g-good:#4C9BFF;--g-mod:#34C47A;--g-bad:#FF9A3D;--g-vbad:#FF5C61;
+  --viz-main:#4C9BFF;--viz-mid:#2D5B94;--viz-warn:#FF9A3D;--viz-muted:#34373C;--viz-muted-2:#555A61;
   --map-area:#17181A;--map-water:#000000;--map-outside:rgba(10,10,11,.9);
   --map-road:#1C1D1F;--map-road-major:#2A2C2F;--map-building:#121314;--map-label:#8A8F91;--map-label-halo:#000000;
 }
