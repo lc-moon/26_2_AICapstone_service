@@ -1,0 +1,454 @@
+{
+ "model": "incheon_log_top60_h-phys_1019_lr3e-05",
+ "view": {
+  "top": 0.6
+ },
+ "roi": {
+  "camera": "79",
+  "clear": {
+   "captured_at": "2026-10-21 12:01:19",
+   "pm25": 2,
+   "pred": 5.2,
+   "humidity": 48,
+   "photo": "about/img/s6_79_clear.webp",
+   "size": [
+    960,
+    540
+   ]
+  },
+  "hazy": {
+   "captured_at": "2026-10-30 11:01:42",
+   "pm25": 27,
+   "pred": 25.2,
+   "humidity": 68,
+   "photo": "about/img/s6_79_hazy.webp",
+   "size": [
+    960,
+    540
+   ]
+  }
+ },
+ "gradcam": {
+  "camera": "103",
+  "clear": {
+   "captured_at": "2026-10-26 07:01:21",
+   "pm25": 6,
+   "pred": 7.1,
+   "humidity": 71,
+   "photo": "about/img/s6_103_clear.webp",
+   "size": [
+    960,
+    540
+   ],
+   "heat": "about/img/s6_103_clear_heat.webp"
+  },
+  "hazy": {
+   "captured_at": "2026-10-25 07:01:15",
+   "pm25": 33,
+   "pred": 29.6,
+   "humidity": 86,
+   "photo": "about/img/s6_103_hazy.webp",
+   "size": [
+    960,
+    540
+   ],
+   "heat": "about/img/s6_103_hazy_heat.webp"
+  }
+ },
+ "scored": {
+  "from": "10/20",
+  "to": "11/1",
+  "days": 13,
+  "photos": 6852
+ },
+ "error": [
+  {
+   "name": "늘 평균(13)만 부르기",
+   "mae": 5.3
+  },
+  {
+   "name": "처음 모델 (10/9까지 배움)",
+   "mae": 3.61,
+   "first": true
+  },
+  {
+   "name": "4km 떨어진 이웃 측정소 실측",
+   "mae": 3.24,
+   "reference": true
+  },
+  {
+   "name": "최종 모델 (28일 + 습도)",
+   "mae": 2.91,
+   "final": true
+  }
+ ],
+ "humidity": {
+  "bins": [
+   {
+    "label": "50% 미만",
+    "n": 3180
+   },
+   {
+    "label": "50~70%",
+    "n": 2327
+   },
+   {
+    "label": "70~85%",
+    "n": 1006
+   },
+   {
+    "label": "85~95%",
+    "n": 339
+   }
+  ],
+  "series": [
+   {
+    "name": "처음 모델 (14일)",
+    "values": [
+     0.72,
+     1.71,
+     2,
+     4.18
+    ]
+   },
+   {
+    "name": "28일로 다시 배움",
+    "values": [
+     -0.92,
+     -0.56,
+     -1.15,
+     1.11
+    ]
+   },
+   {
+    "name": "28일 + 습도 (최종)",
+    "values": [
+     -0.67,
+     -0.41,
+     -1.2,
+     0.5
+    ],
+    "final": true
+   }
+  ]
+ },
+ "compare": {
+  "range": {
+   "from": "2026-10-19",
+   "to": "2026-11-10",
+   "photos": 12532,
+   "last": "2026-11-10 17:21"
+  },
+  "rule": "카메라마다 정한 가장 가까운 측정소의, 사진이 속한 1시간 평균. 그 시각 값이 없으면 뺐다",
+  "thresholds": {
+   "humid": 85,
+   "dusty": 25
+  },
+  "models": [
+   {
+    "model": "incheon_log_top60",
+    "name": "인천 ver",
+    "n": 11040,
+    "days": 20,
+    "mae": 3.62,
+    "bias": 1.04,
+    "first": "2026-10-19",
+    "last": "2026-11-07"
+   },
+   {
+    "model": "incheon_log_top60_h-phys_1019_lr3e-05",
+    "name": "최종 모델 (28일 + 습도)",
+    "n": 1492,
+    "days": 3,
+    "mae": 3.32,
+    "bias": 0.2,
+    "first": "2026-11-08",
+    "last": "2026-11-10"
+   }
+  ],
+  "days": [
+   {
+    "day": "2026-10-19",
+    "n": 595,
+    "mae": 2.84,
+    "bias": 1.72,
+    "est": 9.9,
+    "obs": 8.1,
+    "obs_max": 15.0,
+    "hum": 60.0,
+    "humid": 0.05,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-20",
+    "n": 597,
+    "mae": 4.87,
+    "bias": 3.7,
+    "est": 21.7,
+    "obs": 18.0,
+    "obs_max": 39.0,
+    "hum": 63.0,
+    "humid": 0.07,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-21",
+    "n": 561,
+    "mae": 2.85,
+    "bias": 1.63,
+    "est": 10.6,
+    "obs": 9.0,
+    "obs_max": 23.0,
+    "hum": 50.0,
+    "humid": 0.04,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-22",
+    "n": 638,
+    "mae": 2.62,
+    "bias": 0.31,
+    "est": 10.6,
+    "obs": 10.3,
+    "obs_max": 16.0,
+    "hum": 36.0,
+    "humid": 0.01,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-23",
+    "n": 629,
+    "mae": 4.21,
+    "bias": 2.03,
+    "est": 12.4,
+    "obs": 10.3,
+    "obs_max": 23.0,
+    "hum": 56.0,
+    "humid": 0.02,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-24",
+    "n": 617,
+    "mae": 4.76,
+    "bias": 1.49,
+    "est": 19.0,
+    "obs": 17.5,
+    "obs_max": 31.0,
+    "hum": 78.0,
+    "humid": 0.13,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-25",
+    "n": 588,
+    "mae": 3.6,
+    "bias": 0.43,
+    "est": 12.9,
+    "obs": 12.4,
+    "obs_max": 33.0,
+    "hum": 64.0,
+    "humid": 0.08,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-26",
+    "n": 566,
+    "mae": 3.37,
+    "bias": 2.5,
+    "est": 8.4,
+    "obs": 5.9,
+    "obs_max": 16.0,
+    "hum": 65.0,
+    "humid": 0.0,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-27",
+    "n": 607,
+    "mae": 3.28,
+    "bias": -0.73,
+    "est": 10.9,
+    "obs": 11.6,
+    "obs_max": 24.0,
+    "hum": 32.0,
+    "humid": 0.0,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-28",
+    "n": 616,
+    "mae": 2.56,
+    "bias": 1.48,
+    "est": 9.0,
+    "obs": 7.6,
+    "obs_max": 14.0,
+    "hum": 24.0,
+    "humid": 0.0,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-29",
+    "n": 591,
+    "mae": 3.54,
+    "bias": 0.11,
+    "est": 15.2,
+    "obs": 15.1,
+    "obs_max": 27.0,
+    "hum": 50.0,
+    "humid": 0.0,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-30",
+    "n": 519,
+    "mae": 4.37,
+    "bias": 2.64,
+    "est": 24.4,
+    "obs": 21.8,
+    "obs_max": 36.0,
+    "hum": 61.0,
+    "humid": 0.12,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-10-31",
+    "n": 575,
+    "mae": 3.87,
+    "bias": -2.45,
+    "est": 12.6,
+    "obs": 15.1,
+    "obs_max": 39.0,
+    "hum": 46.0,
+    "humid": 0.02,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-01",
+    "n": 102,
+    "mae": 10.84,
+    "bias": 10.77,
+    "est": 21.8,
+    "obs": 11.0,
+    "obs_max": 16.0,
+    "hum": 91.0,
+    "humid": 0.99,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-02",
+    "n": 552,
+    "mae": 4.96,
+    "bias": -1.4,
+    "est": 20.4,
+    "obs": 21.8,
+    "obs_max": 36.0,
+    "hum": 58.0,
+    "humid": 0.1,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-03",
+    "n": 532,
+    "mae": 3.41,
+    "bias": 0.32,
+    "est": 20.5,
+    "obs": 20.2,
+    "obs_max": 32.0,
+    "hum": 61.0,
+    "humid": 0.02,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-04",
+    "n": 488,
+    "mae": 4.06,
+    "bias": 1.31,
+    "est": 21.4,
+    "obs": 20.1,
+    "obs_max": 41.0,
+    "hum": 52.0,
+    "humid": 0.02,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-05",
+    "n": 494,
+    "mae": 3.39,
+    "bias": 1.42,
+    "est": 15.7,
+    "obs": 14.3,
+    "obs_max": 29.0,
+    "hum": 60.0,
+    "humid": 0.01,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-06",
+    "n": 614,
+    "mae": 2.58,
+    "bias": 0.92,
+    "est": 10.4,
+    "obs": 9.5,
+    "obs_max": 19.0,
+    "hum": 37.0,
+    "humid": 0.0,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-07",
+    "n": 559,
+    "mae": 2.65,
+    "bias": 0.78,
+    "est": 9.4,
+    "obs": 8.6,
+    "obs_max": 16.0,
+    "hum": 28.0,
+    "humid": 0.02,
+    "model": "incheon_log_top60"
+   },
+   {
+    "day": "2026-11-08",
+    "n": 425,
+    "mae": 2.62,
+    "bias": -1.19,
+    "est": 10.0,
+    "obs": 11.2,
+    "obs_max": 20.0,
+    "hum": 53.0,
+    "humid": 0.0,
+    "model": "incheon_log_top60_h-phys_1019_lr3e-05"
+   },
+   {
+    "day": "2026-11-09",
+    "n": 530,
+    "mae": 3.45,
+    "bias": 2.37,
+    "est": 12.9,
+    "obs": 10.5,
+    "obs_max": 24.0,
+    "hum": 72.0,
+    "humid": 0.17,
+    "model": "incheon_log_top60_h-phys_1019_lr3e-05"
+   },
+   {
+    "day": "2026-11-10",
+    "n": 537,
+    "mae": 3.73,
+    "bias": -0.85,
+    "est": 11.0,
+    "obs": 11.8,
+    "obs_max": 32.0,
+    "hum": 51.0,
+    "humid": 0.02,
+    "model": "incheon_log_top60_h-phys_1019_lr3e-05"
+   }
+  ],
+  "worst": [
+   "2026-10-20",
+   "2026-10-24",
+   "2026-11-01",
+   "2026-11-02"
+  ]
+ }
+}
