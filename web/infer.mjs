@@ -1,4 +1,4 @@
-import {element,cameraFigure,gradePill} from './evidence.mjs';
+import {element,cameraFigure,gradePill,enlargeable} from './evidence.mjs';
 import {formatTime,validValue} from './core.mjs';
 export function inferFailure(status) {
   return status===409?'다른 분이 추정 중이에요. 잠시 뒤 다시 눌러 주세요.':'지금은 할 수 없어요. 마지막 회차 사진과 값은 그대로 볼 수 있어요';
@@ -88,13 +88,15 @@ export function mountInference(host,camera,options,onBusy=()=>{}) {
         await wait(2500,controller.signal);if(disposed)return;
         status.textContent='다 됐어요';step(4);title.textContent='마지막 낮 사진의 추정 결과';
         const when=formatTime(camera.captured_at);
-        scanThen(cameraFigure(camera,options,`${when} 촬영`),()=>showNumber(camera.pm25,{status:camera.status,lines:[{text:`${when}에 찍은 마지막 낮 사진이에요. 밤에는 새로 찍어 추정하지 않아요.`}]}));
+        const lastFigure=cameraFigure(camera,options,`${when} 촬영`);
+        scanThen(lastFigure,()=>{enlargeable(lastFigure,camera,'마지막 낮에 찍은 사진이에요');showNumber(camera.pm25,{status:camera.status,lines:[{text:`${when}에 찍은 마지막 낮 사진이에요. 밤에는 새로 찍어 추정하지 않아요.`}]});});
         return;
       }
       if(data.captured_at==null){clear();title.textContent='지금은 추정하지 않아요';message(/밤/.test(data.status||'')?'밤에는 어두운 사진을 학습하지 않아 추정하지 않아요. 지도는 측정소 실측으로 채워져 있어요.':(data.status||'추정 안 함'));return;}
       clear();status.textContent='다 됐어요';step(4);if(data.cached)title.textContent='방금 누른 결과';
       const lines=[];if(Number.isFinite(data.elapsed_s))lines.push({text:`처리 ${data.elapsed_s.toFixed(1)}초`});lines.push({text:'이 결과는 지도 값을 바꾸지 않아요',strong:true});
-      scanThen(cameraFigure({...camera,...data},options,`${formatTime(data.captured_at)} 촬영`),()=>showNumber(data.pm25,{status:data.status,lines}));
+      const figure=cameraFigure({...camera,...data},options,`${formatTime(data.captured_at)} 촬영`);
+      scanThen(figure,()=>{enlargeable(figure,{...camera,...data},'방금 가져온 사진이에요');showNumber(data.pm25,{status:data.status,lines});});
     }catch(error){if(!disposed)message(inferFailure(error?.status));}
     finally{clear();controller=null;if(!disposed){button.disabled=false;onBusy(false);}}
   };

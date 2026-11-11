@@ -34,6 +34,58 @@ export function cameraFigure(camera, options, chip='아래 40%는 서버에서 �
   return figure;
 }
 
+// 사진의 촬영 시각: CCTV 화면 오른쪽 위에 찍혀 있다(사진 대비 가로 64~98%, 세로 4~8%, 11/12 카메라 20대 확인).
+// 143번은 9/28부터 화면에 시각이 없어서, 서버가 사진을 가져온 시각(captured_at)을 같은 자리에 붙인다
+const NO_CLOCK=new Set(['143']);
+export function clockText(t) {
+  return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date(t));
+}
+export function timeMark(cameraId,capturedAt,caption) {
+  const clock=clockText(capturedAt),burned=!NO_CLOCK.has(String(cameraId));
+  return {burned,clock,caption:`${caption} · ${clock}`,note:burned?null:'카메라 화면에 시각이 없어 가져온 시각을 붙였어요'};
+}
+
+// 크게 보기: 화면을 덮는 판 하나를 사진들이 같이 쓴다. 마우스를 올리면 열리고 떼면 닫힌다.
+// 누르면 고정, 아무 데나 누르거나 Esc로 닫는다. 패널이 다시 그려져 사진이 사라지면 마우스가 움직일 때 닫는다
+let view=null,current=null,pinned=false;
+function closeView() {pinned=false;current=null;view?.classList.remove('open','pinned');}
+function openView(wrap,build,pin) {
+  if(!view){
+    view=element('div',null,'photo-view');view.setAttribute('aria-hidden','true');view.addEventListener('click',closeView);
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&view.classList.contains('open')){e.stopPropagation();closeView();}},true);
+    document.addEventListener('pointermove',()=>{if(current&&!pinned&&!(current.isConnected&&current.matches(':hover')))closeView();});
+    document.body.append(view);
+  }
+  if(current!==wrap){view.classList.remove('open');view.replaceChildren(build());void view.offsetWidth;}   // 새 사진이면 등장 효과를 처음부터
+  current=wrap;pinned=pin;view.classList.add('open');view.classList.toggle('pinned',pin);
+}
+export function enlargeable(figure,camera,caption) {
+  const wrap=figure.querySelector('.camera-photo'),image=wrap?.querySelector('img');
+  if(!image||!Number.isFinite(Date.parse(camera.captured_at)))return;
+  const mark=timeMark(camera.camera_id,camera.captured_at,caption),badge=()=>element('span',`가져온 시각 ${mark.clock}`,'time-badge');
+  const hover=globalThis.matchMedia?.('(hover: hover)').matches;
+  if(!mark.burned)wrap.append(badge());
+  const chips=element('div',null,'photo-chips'),chip=wrap.querySelector('.photo-chip');   // 아래 이름표 위에 안내를 왼쪽 정렬로 쌓는다
+  if(chip)chips.append(chip);chips.append(element('span',hover?'마우스를 올리면 크게 보여요':'누르면 크게 보여요','photo-hint'));
+  wrap.append(element('i',null,'time-box'),chips);
+  wrap.classList.add('time-mark');wrap.tabIndex=0;wrap.setAttribute('aria-label',`사진 크게 보기: ${mark.caption}`);
+  const build=()=>{
+    const stage=element('div',null,'photo-view-stage'),big=element('img'),cap=element('div',null,'time-caption');
+    big.src=image.src;big.alt='';
+    cap.append(element('b',mark.caption));if(mark.note)cap.append(element('span',mark.note));
+    stage.append(big,element('div',null,'camera-roi'),element('i',null,'view-scan'),element('span','모델이 보는 곳 · 위 60%','photo-roi-label'));
+    if(!mark.burned)stage.append(badge());
+    stage.append(element('i',null,'time-box'),cap);
+    return stage;
+  };
+  const mouse=e=>e.pointerType==='mouse';
+  wrap.addEventListener('pointerenter',e=>{if(mouse(e))openView(wrap,build,false);});
+  wrap.addEventListener('pointerleave',e=>{if(mouse(e)&&!pinned&&current===wrap)closeView();});
+  wrap.addEventListener('focus',()=>openView(wrap,build,false));
+  wrap.addEventListener('blur',()=>{if(!pinned&&current===wrap)closeView();});
+  wrap.addEventListener('click',()=>{if(pinned&&current===wrap)closeView();else openView(wrap,build,true);});
+}
+
 export function panelTitle(place,gu) {
   if(!place)return `${gu || '선택한 위치'} 부근`;
   return gu&&place.includes(gu)?place:`${place} · ${gu || '선택한 위치'}`;   // 지번 검색은 이름에 구가 이미 들어 있다
@@ -163,7 +215,7 @@ function cameraStage(data,options) {
   head.append(element('h3','가까운 CCTV 사진'),element('span',`${c.name}${Number.isFinite(c.distance_km)?' · '+c.distance_km.toFixed(1)+'km':''}`));
   card.append(head);
   if(c.nearest)card.append(element('p',nearestMessage(c,'camera'),'nearest-note'));
-  card.append(cameraFigure(c,options));
+  const figure=cameraFigure(c,options);enlargeable(figure,c,data.estimate?.source==='station'?'마지막 낮에 찍은 사진이에요':'지금 지도 값 계산에 쓰인 사진이에요');card.append(figure);
   const foot=element('div',null,'photo-foot'),result=element('span',null,'camera-result');
   if(validValue(c.pm25))result.append('이 사진의 추정값 ',element('b',String(Math.round(c.pm25))),' ㎍/㎥');else result.textContent=`이 사진의 추정값: ${c.status||'추정 안 함'}`;
   foot.append(element('span',`${formatTime(c.captured_at)} 촬영`),result);card.append(foot);
