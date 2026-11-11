@@ -177,7 +177,7 @@ b,strong{font-weight:500}
 .camera-photo{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:8px;background:var(--elev)}
 .camera-photo img{display:block;width:100%;height:100%;object-fit:contain}
 .camera-roi{position:absolute;inset:0 0 auto;height:60%;border:2px solid var(--roi);box-shadow:0 0 0 1px var(--roi-outline),inset 0 0 0 1px var(--roi-outline);border-radius:8px 8px 0 0;pointer-events:none}
-.photo-roi-label,.photo-chip{position:absolute;left:8px;padding:2px 8px;border-radius:4px;font-size:12px;white-space:nowrap}
+.photo-roi-label,.photo-chip{position:absolute;left:8px;padding:3px 9px;border-radius:4px;font-size:14px;font-weight:500;white-space:nowrap}
 .photo-roi-label{top:8px;background:var(--roi);color:var(--roi-on)}.photo-chip{bottom:8px;background:var(--photo-chip);color:var(--photo-chip-on)}
 .photo-empty{padding:32px 20px;font-size:14px;line-height:1.5;color:var(--sub);text-align:center}
 .photo-foot{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--sub)}
@@ -211,6 +211,34 @@ b,strong{font-weight:500}
 .spin{width:36px;height:36px;border-radius:50%;border:3px solid var(--line-strong);border-top-color:var(--ink);animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .reveal{animation:reveal 700ms var(--ease-enter) both}@keyframes reveal{from{opacity:0;clip-path:inset(0 0 100% 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
 .scan{position:absolute;left:3px;right:3px;top:0;height:3px;border-radius:2px;background:var(--highlight);box-shadow:0 0 0 1px var(--surf);animation:scan 1.6s var(--ease-blink) infinite alternate}@keyframes scan{from{top:2px}to{top:calc(60% - 5px)}}
+/* 사진 크게 보기(직접 해보기·가까운 CCTV): 작은 사진에는 시각 테두리와 안내, 마우스를 올리면 화면을 덮는 판.
+   판이 열리면 모델 영역 테두리 → 훑는 선·이름표 → 시각 테두리 → 문구 순서로 나타난다 */
+.time-mark{cursor:zoom-in;container-type:inline-size;outline-offset:2px}
+.time-box{position:absolute;left:63%;top:2%;width:36%;height:8%;border:2px solid var(--roi);box-shadow:0 0 0 1px var(--roi-outline),inset 0 0 0 1px var(--roi-outline);border-radius:4px;pointer-events:none;animation:time-in 600ms var(--ease-enter) both}
+@keyframes time-in{from{opacity:0;transform:scale(1.2)}to{opacity:1;transform:none}}
+.photo-chips{position:absolute;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;pointer-events:none}
+.photo-chips .photo-chip{position:static}
+.photo-hint{padding:3px 9px;border-radius:4px;background:var(--roi);color:var(--roi-on);font-size:14px;font-weight:500;white-space:nowrap;pointer-events:none;animation:hint-in 400ms var(--ease-enter) 500ms both}
+@keyframes hint-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.time-badge{position:absolute;right:2%;top:3.6%;font-size:2.9cqw;line-height:1.45;font-weight:500;color:#FFFFFF;white-space:nowrap;font-variant-numeric:tabular-nums;
+  text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000;pointer-events:none}
+.photo-view{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:rgba(0,0,0,.74);pointer-events:none;opacity:0;visibility:hidden;transition:opacity 220ms var(--ease-enter),visibility 0s 220ms}
+.photo-view.open{opacity:1;visibility:visible;transition:opacity 220ms var(--ease-enter)}
+.photo-view.pinned{pointer-events:auto;cursor:zoom-out}
+.photo-view-stage{position:relative;width:min(92vw,calc(84vh * 16 / 9));aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;container-type:inline-size;transform:scale(.94);transition:transform 320ms var(--ease-sheet)}
+.photo-view.open .photo-view-stage{transform:none}
+.photo-view-stage img{display:block;width:100%;height:100%;object-fit:contain}
+.photo-view .camera-roi{border-width:3px;border-radius:12px 12px 0 0;opacity:0;transform:scale(1.03);transform-origin:50% 0;transition:opacity 300ms var(--ease-enter) 150ms,transform 450ms var(--ease-sheet) 150ms}
+.photo-view .photo-roi-label{left:1.6%;top:2.4%;padding:6px 14px;border-radius:6px;font-size:clamp(15px,1.7cqw,22px);opacity:0;transform:translateY(-6px);transition:opacity 300ms var(--ease-enter) 350ms,transform 300ms var(--ease-enter) 350ms}
+.view-scan{position:absolute;left:4px;right:4px;top:0;height:3px;border-radius:2px;background:var(--roi);box-shadow:0 0 0 1px var(--roi-outline);opacity:0;pointer-events:none}
+.photo-view.open .view-scan{animation:roi-sweep 1.1s var(--ease-sheet) 200ms both}
+@keyframes roi-sweep{0%{top:0;opacity:0}10%{opacity:1}80%{top:calc(60% - 3px);opacity:1}100%{top:calc(60% - 3px);opacity:0}}
+.photo-view .time-box{border-width:3px;border-radius:6px;animation:none;opacity:0;transform:scale(1.25);transition:opacity 300ms var(--ease-enter) 700ms,transform 450ms var(--ease-sheet) 700ms}
+.photo-view .time-caption{position:absolute;right:1%;top:calc(10% + 12px);display:flex;flex-direction:column;align-items:flex-end;gap:6px;
+  opacity:0;transform:translateY(-6px);transition:opacity 300ms var(--ease-enter) 950ms,transform 300ms var(--ease-enter) 950ms}
+.time-caption>*{padding:8px 16px;border-radius:6px;background:var(--roi);color:var(--roi-on);font-size:clamp(15px,1.9cqw,24px);font-weight:500;white-space:nowrap}
+.time-caption>span{padding:5px 12px;background:var(--photo-chip);color:var(--photo-chip-on);font-size:clamp(13px,1.4cqw,18px);font-weight:400}
+.photo-view.open :is(.camera-roi,.photo-roi-label,.time-box,.time-caption){opacity:1;transform:none}
 
 /* 안내창 */
 #notice{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:16px;background:var(--scrim)}
