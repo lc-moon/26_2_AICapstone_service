@@ -117,7 +117,8 @@ async function selectPoint(p,fly=true,placeName=null){
  }catch{if(request===pointRequest)$('details').replaceChildren(text('div','상세 조회 실패','place'),text('p','연결을 확인하고 지도를 다시 눌러 주세요'));}
 }
 function closePanel(){disposeInference();clearEvidencePins();selection=null;selectionName=null;pointRequest++;$('panel').hidden=true;$('hint').hidden=false;document.body.classList.remove('has-selection');map?.getSource('pick')?.setData(empty);}
-function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:pad});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo(save);return lo;}function panelPad(){
+// 첫 화면 줌: 세로가 짧은 창은 maxBounds 때문에 찾은 줌까지 못 내려가 8로 떨어졌고, map-close로 제목이 숨었다(11/12). 실제로 갈 수 있는 줌을 돌려준다
+function fitZoom(center,pad){const save={center:map.getCenter(),zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing(),padding:map.getPadding()},pts=grid.boundary.coordinates.flat(2),c=map.getCanvas(),W=c.clientWidth,H=c.clientHeight;let lo=8,hi=15;for(let i=0;i<18;i++){const z=(lo+hi)/2;map.jumpTo({center,zoom:z,pitch:40,bearing:-12,padding:pad});pts.every(p=>{const q=map.project(p);return q.x>=pad.left&&q.x<=W-pad.right&&q.y>=pad.top&&q.y<=H-pad.bottom})?lo=z:hi=z;}map.jumpTo({center,zoom:lo,pitch:40,bearing:-12,padding:pad});const reach=map.getZoom();map.jumpTo(save);return reach;}function panelPad(){
  const p=$('panel'),top=$('topbar').offsetHeight;   // 아래 판을 뺀 지도 칸의 가운데로 (올라오는 움직임 중에도 offsetHeight는 그대로다)
  return {top,bottom:Math.min(p.offsetHeight,innerHeight-top-100),left:0,right:0};
 }
