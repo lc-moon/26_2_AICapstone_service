@@ -42,7 +42,7 @@ export function clockText(t) {
 }
 export function timeMark(cameraId,capturedAt,caption) {
   const clock=clockText(capturedAt),burned=!NO_CLOCK.has(String(cameraId));
-  return {burned,clock,caption:`${caption} · ${clock}`,note:burned?null:'카메라 화면에 시각이 없어 가져온 시각을 붙였어요'};
+  return {burned,clock,caption,note:burned?null:'카메라 화면에 시각이 없어 가져온 시각을 붙였어요'};   // 문구에 시각을 넣지 않는다: CCTV 영상이 약 40초 늦어 사진 속 시각과 어긋난다(11/12)
 }
 
 // 크게 보기: 화면을 덮는 판 하나를 사진들이 같이 쓴다. 마우스를 올리면 열리고 떼면 닫힌다.

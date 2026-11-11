@@ -30,6 +30,6 @@ test('value labels add the date only when the day differs',async()=>{const {cloc
 });
 test('capture time: seconds in Seoul time, 143 has no clock on screen so it is labelled as fetched time',()=>{
  assert.equal(clockText('2026-10-16T04:33:05Z'),'13:33:05');
- const burned=timeMark('10042','2026-10-16T13:33:05+09:00','방금 가져온 사진이에요');assert.equal(burned.burned,true);assert.equal(burned.caption,'방금 가져온 사진이에요 · 13:33:05');assert.equal(burned.note,null);
+ const burned=timeMark('10042','2026-10-16T13:33:05+09:00','방금 가져온 사진이에요');assert.equal(burned.burned,true);assert.equal(burned.caption,'방금 가져온 사진이에요');assert.equal(burned.clock,'13:33:05');assert.equal(burned.note,null);
  const none=timeMark(143,'2026-10-16T13:33:05+09:00','방금 가져온 사진이에요');assert.equal(none.burned,false);assert.match(none.note,/가져온 시각/);
 });
