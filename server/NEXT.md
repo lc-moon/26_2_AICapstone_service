@@ -33,8 +33,8 @@
   - CCTV 지도 → `normal`
   - 측정소 지도 + `is_day(slot)`가 false → `night`, `cctv: null`
   - 측정소 지도 + 낮 → 그 회차(`slot`)의 화면 범위 카메라 estimates를 본다
-    - 값 있는 카메라가 1대 이상(= `MIN_CCTV` 미만이라 측정소로 간 것) → `few_cameras`
-    - 0대면 `status`로 가장 많은 이유: `비`로 시작 → `rain`, `습도 95% 이상` → `humidity`, 그 밖(`습도 결측`, `사진 읽기 실패`) 또는 행이 없음 → `no_data`. 같은 수면 `rain` > `humidity` > `no_data`
+    - 값이 없는 카메라들의 `status`로 가장 많은 이유: `비`로 시작 → `rain`, `습도 95% 이상` → `humidity`, 그 밖(`습도 결측`, `사진 읽기 실패`) 또는 행이 없음 → 값 있는 카메라가 1대 이상이면 `few_cameras`, 0대면 `no_data`. 같은 수면 `rain` > `humidity` > 그 밖
+    - (11/13 변경) 전에는 값 있는 카메라가 1대라도 있으면 무조건 `few_cameras`였다. 습도 97% 아침에 3대만 남자 "3대뿐"으로 떠서, 빠진 카메라 대부분의 이유(비·습도)를 먼저 보이게 했다
 - `?source=cctv`도 같은 필드를 줍니다(항상 `normal`)
 - 완료 기준(테스트): ① 정상 19/19 → `normal` ② 밤 → `night`·`null` ③ 전부 비 → `rain`·`{valid:0,total:19}` ④ 전부 습도 95% 이상 → `humidity` ⑤ 유효 9대 → `few_cameras`·`{valid:9,...}` ⑥ 전부 습도 결측 → `no_data` ⑦ 응답 키가 `next/` 예시와 같음
 

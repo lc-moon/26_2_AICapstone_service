@@ -305,12 +305,14 @@ def map_state(conn, slot, source):
     with_value = sorted(cam for pm, _, cam in rows if pm is not None)   # 첫 화면 카메라 점: 값이 없는 카메라는 흐리게
     if source == "cctv":
         return "normal", cctv, with_value
-    if cctv["valid"]:
-        return "few_cameras", cctv, with_value
-    rain = sum((st or "").startswith("비") for _, st, _ in rows)
-    humidity = sum((st or "").startswith("습도 95% 이상") for _, st, _ in rows)
-    counts = [(rain, "rain"), (humidity, "humidity"), (len(rows) - rain - humidity, "no_data")]
-    return max(counts, key=lambda c: c[0])[1], cctv, with_value   # max는 같은 수면 앞의 것: rain > humidity > no_data
+    # 값이 없는 카메라들의 가장 많은 이유. 몇 대가 살아 있어도 대부분이 비·습도로 빠졌으면 그 이유를 보여 준다(11/13:
+    # 습도 97% 아침에 3대만 남아 "3대뿐"으로 떴다). 고장·자료 없음이 가장 많을 때만 few_cameras(값 0대면 no_data)
+    missing = [st or "" for pm, st, _ in rows if pm is None]
+    rain = sum(st.startswith("비") for st in missing)
+    humidity = sum(st.startswith("습도 95% 이상") for st in missing)
+    other = "few_cameras" if cctv["valid"] else "no_data"
+    counts = [(rain, "rain"), (humidity, "humidity"), (len(missing) - rain - humidity, other)]
+    return max(counts, key=lambda c: c[0])[1], cctv, with_value   # max는 같은 수면 앞의 것: rain > humidity > 그 밖
 
 
 @app.get("/api/frames/latest")

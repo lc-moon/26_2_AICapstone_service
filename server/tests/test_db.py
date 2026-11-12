@@ -502,8 +502,11 @@ def test_state_night_is_null(client, db, monkeypatch):
     ([(19, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
     ([(19, WX_MISSING, None)], "no_data", 0, "frames_latest_rain.json"),
     ([(19, "사진 읽기 실패", None)], "no_data", 0, "frames_latest_rain.json"),
-    ([(9, "정상", 10.0), (10, RAIN, None)], "few_cameras", 9, "frames_latest_few.json"),
+    ([(9, "정상", 10.0), (10, RAIN, None)], "rain", 9, "frames_latest_few.json"),        # 몇 대 살아 있어도 빠진 이유가 비면 rain
+    ([(3, "정상", 10.0), (16, HUMID, None)], "humidity", 3, "frames_latest_few.json"),   # 11/13 아침(습도 97%): "3대뿐" 대신 습도
+    ([(9, "정상", 10.0), (10, "사진 읽기 실패", None)], "few_cameras", 9, "frames_latest_few.json"),
     ([(1, "정상", 10.0)], "few_cameras", 1, "frames_latest_few.json"),       # 나머지 18대는 행이 없음
+    ([(3, "정상", 10.0), (8, HUMID, None)], "few_cameras", 3, "frames_latest_few.json"),  # 빠진 17대 중 습도 8 < 행 없음 9(103번 포함)
     ([(10, RAIN, None), (9, HUMID, None)], "rain", 0, "frames_latest_rain.json"),
     ([(5, RAIN, None), (14, HUMID, None)], "humidity", 0, "frames_latest_rain.json"),
     ([(7, RAIN, None), (7, HUMID, None), (5, WX_MISSING, None)], "rain", 0, "frames_latest_rain.json"),     # 같은 수: rain > humidity
