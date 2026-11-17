@@ -3,6 +3,8 @@
 인천 CCTV 20대의 사진으로 AI가 추정한 초미세먼지(PM2.5) 농도를 **인천 지도 위에 구름처럼** 보여 주는 웹 서비스입니다.
 누른 곳의 추정 농도와 가까운 측정소 실측값을 알려 주고, 20분마다 갱신합니다.
 
+🌐 **https://incheon-air.duckdns.org**
+
 ![시안](shared/mockup/screenshot.jpg)
 
 2026-2 캡스톤디자인 · 교내 전시회 2026-11-11 · 수집기와 AI 모델은 [26_2_AICapstone](https://github.com/lc-moon/26_2_AICapstone)
